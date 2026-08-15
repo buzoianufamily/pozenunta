@@ -3,6 +3,10 @@ require_once __DIR__ . '/functions.php';
 header('Content-Type: application/json; charset=utf-8');
 asigura_schema();
 
+/* Nu mai scriem nimic în sesiune de aici încolo: eliberăm blocajul, ca
+   celelalte cereri ale aceluiași vizitator să nu aștepte după noi. */
+inchide_sesiune();
+
 $actiune = $_GET['actiune'] ?? 'lista';
 
 if ($actiune === 'lista') {

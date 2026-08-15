@@ -17,6 +17,7 @@
    ============================================================ */
 require_once __DIR__ . '/functions.php';
 header('Content-Type: application/json; charset=utf-8');
+inchide_sesiune();   // bucățile nu ating sesiunea; fără blocaj, urcă în paralel
 
 /* Atenție: NU atingem baza de date la „stare" și „bucata". Un film de
    1 GB înseamnă ~250 de bucăți; dacă fiecare ar deschide o conexiune,

@@ -104,8 +104,12 @@ function amprenta_jeton(string $jeton): ?string {
 /* ============================================================
    AUTENTIFICARE ADMIN
    ============================================================ */
+/* Fără sesiune pornită nu există autentificare.
+   Verificăm $_SESSION, nu session_status(): după inchide_sesiune() starea
+   devine „inactiv", dar datele citite rămân disponibile — iar adminul
+   trebuie să rămână admin până la finalul cererii. */
 function este_admin(): bool {
-    return !empty($_SESSION['admin']);
+    return isset($_SESSION) && !empty($_SESSION['admin']);
 }
 
 function cere_admin(): void {
@@ -117,13 +121,15 @@ function cere_admin(): void {
 
 /* Token CSRF simplu pentru formularele din admin */
 function csrf_token(): string {
+    porneste_sesiune(true);   // aici chiar avem nevoie de sesiune
     if (empty($_SESSION['csrf'])) {
         $_SESSION['csrf'] = bin2hex(random_bytes(32));
     }
     return $_SESSION['csrf'];
 }
 function csrf_valid(?string $token): bool {
-    return !empty($token) && !empty($_SESSION['csrf']) && hash_equals($_SESSION['csrf'], $token);
+    return isset($_SESSION) && !empty($token) && !empty($_SESSION['csrf'])
+        && hash_equals($_SESSION['csrf'], $token);
 }
 
 /* ============================================================

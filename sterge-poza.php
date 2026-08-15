@@ -11,6 +11,7 @@
    ============================================================ */
 require_once __DIR__ . '/functions.php';
 header('Content-Type: application/json; charset=utf-8');
+inchide_sesiune();   // starea de admin s-a citit deja
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);

@@ -2,6 +2,7 @@
 require_once __DIR__ . '/functions.php';
 header('Content-Type: application/json; charset=utf-8');
 asigura_schema();
+inchide_sesiune();   // încărcarea nu atinge sesiunea
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);

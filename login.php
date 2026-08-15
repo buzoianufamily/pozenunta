@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/functions.php';
+porneste_sesiune(true);   // pagina de autentificare are nevoie de sesiune
 
 if (este_admin()) { header('Location: admin.php'); exit; }
 

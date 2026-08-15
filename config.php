@@ -53,11 +53,37 @@ define('THUMB_URL',  'uploads/thumbs/');
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
 
-// Sesiune
-if (session_status() === PHP_SESSION_NONE) {
-    session_set_cookie_params(['lifetime' => 0, 'httponly' => true, 'samesite' => 'Lax']);
+/* ---------- Sesiune ----------
+   PHP ține un blocaj exclusiv pe fișierul de sesiune cât durează cererea,
+   deci două cereri ale aceluiași vizitator se așteaptă una pe alta. La
+   încărcarea pe bucăți, unde plecă mai multe cereri deodată, asta le-ar
+   pune la coadă degeaba.
+
+   Un vizitator care nu are cookie de sesiune sigur nu este autentificat,
+   deci nu-i pornim sesiune: fără fișier scris, fără blocaj. Sesiunea
+   pornește doar pentru cine chiar are una (mirii) sau la cerere expresă
+   (pagina de autentificare). */
+function porneste_sesiune(bool $forteaza = false): void {
+    if (session_status() !== PHP_SESSION_NONE) return;
+    if (!$forteaza && empty($_COOKIE[session_name()])) return;
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path'     => '/',
+        'httponly' => true,
+        'samesite' => 'Lax',
+        'secure'   => !empty($_SERVER['HTTPS']),
+    ]);
     session_start();
 }
+
+/* Eliberează blocajul mai devreme, când nu mai scriem în sesiune. */
+function inchide_sesiune(): void {
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
+    }
+}
+
+porneste_sesiune();
 
 // Conexiune PDO (reutilizabilă)
 function db(): PDO {
