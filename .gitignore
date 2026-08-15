@@ -1,0 +1,13 @@
+# Fișiere încărcate de invitați (poze/filme) — NU se urcă în git
+uploads/*
+uploads/thumbs/*
+# ...dar păstrăm structura și fișierele de protecție
+!uploads/.htaccess
+!uploads/index.html
+!uploads/thumbs/
+!uploads/thumbs/index.html
+
+# Diverse
+.DS_Store
+Thumbs.db
+*.log

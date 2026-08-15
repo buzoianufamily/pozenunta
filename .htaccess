@@ -1,0 +1,39 @@
+# ---- Album nuntă: securitate & performanță ----
+Options -Indexes
+
+# Pagina de start
+DirectoryIndex index.php
+
+# Nu permite accesul direct la fișiere sensibile
+<FilesMatch "(?i)(config\.php|functions\.php|partiale\.php)$">
+  Require all denied
+</FilesMatch>
+<FilesMatch "(?i)\.(ini|log|sql|md|sh|bak)$">
+  Require all denied
+</FilesMatch>
+
+# UTF-8
+AddDefaultCharset UTF-8
+
+# Cache pentru fișierele statice (poze, css, js)
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType image/jpeg "access plus 30 days"
+  ExpiresByType image/png  "access plus 30 days"
+  ExpiresByType image/webp "access plus 30 days"
+  ExpiresByType image/gif  "access plus 30 days"
+  ExpiresByType video/mp4  "access plus 30 days"
+  ExpiresByType text/css   "access plus 7 days"
+  ExpiresByType application/javascript "access plus 7 days"
+</IfModule>
+
+# Comprimare text
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml
+</IfModule>
+
+# Câteva anteturi de securitate
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+  Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
