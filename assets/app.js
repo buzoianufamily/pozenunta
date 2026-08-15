@@ -22,7 +22,11 @@
   /* ---------- aprecieri (partajat galerie + lightbox) ---------- */
   var CHEIE_LIKE = 'bz_likes';
   function likeSet() { try { return new Set(JSON.parse(localStorage.getItem(CHEIE_LIKE) || '[]')); } catch (e) { return new Set(); } }
-  function salveazaLike(set) { try { localStorage.setItem(CHEIE_LIKE, JSON.stringify(Array.prototype.slice.call(set))); } catch (e) {} }
+  /* Atenție: Array.prototype.slice nu funcționează pe un Set — nu are
+     lungime și nici indici, deci întorcea mereu un tablou gol. Din cauza
+     asta nu se salva nimic, iar fiecare apăsare pe inimă părea o
+     apreciere nouă: nu se mai putea retrage. */
+  function salveazaLike(set) { try { localStorage.setItem(CHEIE_LIKE, JSON.stringify(Array.from(set))); } catch (e) {} }
   function esteApreciat(id) { return likeSet().has(id); }
 
   /* Serverul e sursa de adevăr: ține aprecierile pe invitat, nu pe
