@@ -11,6 +11,39 @@ function h($text): string {
     return htmlspecialchars((string)$text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+/* ---------- Limitele reale de încărcare ----------
+   Nu presupunem nimic: le citim de la server. Pe cPanel valorile se pot
+   seta pe fiecare domeniu în parte, deci pot să difere de la un site la
+   altul din același cont. */
+function octeti_din_ini(string $val): int {
+    $val = trim($val);
+    if ($val === '' || $val === '-1') return 0;          // 0 = fără limită
+    $u = strtolower($val[strlen($val) - 1]);
+    $n = (float)$val;
+    switch ($u) {
+        case 'g': $n *= 1024; // fall through
+        case 'm': $n *= 1024; // fall through
+        case 'k': $n *= 1024;
+    }
+    return (int)$n;
+}
+
+/* Cât acceptă serverul într-o SINGURĂ cerere. */
+function limita_pe_cerere(): int {
+    $umf = octeti_din_ini((string)ini_get('upload_max_filesize'));
+    $pms = octeti_din_ini((string)ini_get('post_max_size'));
+    $v = array_filter([$umf, $pms]);                      // ignorăm „fără limită"
+    return empty($v) ? 64 * 1024 * 1024 : (int)min($v);
+}
+
+/* Mărimea unei bucăți la încărcarea filmelor mari.
+   Bucăți mai mari înseamnă mai puține cereri, deci mai puțină apăsare pe
+   server — dar trebuie să încapă într-o cerere, altfel toate eșuează. */
+function dimensiune_bucata(): int {
+    $sigur = (int)(limita_pe_cerere() * 0.8);             // lăsăm loc pentru antet
+    return max(1024 * 1024, min(8 * 1024 * 1024, $sigur));
+}
+
 /* ---------- Dimensiune lizibilă ---------- */
 function format_marime(int $octeti): string {
     $u = ['B','KB','MB','GB','TB'];

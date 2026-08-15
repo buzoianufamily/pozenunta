@@ -145,14 +145,23 @@
 
     var coada = [];
     var poolRuleaza = false;
-    var CONC = 3, MAX_TRIES = 4, BACKOFF = [800, 2000, 4000];
+    /* Câte fișiere urcă odată. Fiecare ține ocupat un proces pe server,
+       iar la o nuntă urcă zeci de telefoane în același timp — cu 3 de
+       fiecare, serverul se îneacă și se încetinește tot site-ul. */
+    var CONC = 2, MAX_TRIES = 4, BACKOFF = [800, 2000, 4000];
 
     /* Fișierele mai mari de atât se trimit pe bucăți, ca să poată fi
        reluate din punctul rămas. Pozele (micșorate pe telefon, ~1-2 MB)
        merg dintr-o bucată — e mai rapid și e drumul deja verificat. */
+    var LIMITE = window.NUNTA || {};
     var PRAG_BUCATI = 8 * 1024 * 1024;
-    var BUCATA      = 4 * 1024 * 1024;
-    var BUCATA_TRIES = 3, BUCATA_BACKOFF = [1000, 3000, 6000];
+    /* Mărimea bucății vine de la server, care știe cât acceptă într-o
+       cerere. Bucăți mai mari = mai puține cereri: un film de 700 MB
+       cerea 175 de cereri cu bucăți de 4 MB, și doar 88 cu 8 MB. */
+    var BUCATA = LIMITE.bucata || 4 * 1024 * 1024;
+    /* Reluarea e ieftină (continuă din punctul rămas), deci are rost să
+       insistăm mai mult înainte să renunțăm la un fișier. */
+    var BUCATA_TRIES = 5, BUCATA_BACKOFF = [1000, 3000, 6000, 12000, 20000];
 
     function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 
@@ -184,11 +193,26 @@
       return false;
     }
 
+    function marimeText(o) {
+      var u = ['B', 'KB', 'MB', 'GB'], i = 0, n = o;
+      while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+      return (n >= 10 || i === 0 ? Math.round(n) : Math.round(n * 10) / 10) + ' ' + u[i];
+    }
+
     function adauga(fileList) {
-      var sarite = 0;
+      var sarite = 0, preaMari = [];
       Array.prototype.forEach.call(fileList, function (f) {
         if (!esteImagine(f) && !esteVideo(f)) return;
         if (dejaInLista(f)) { sarite++; return; }
+
+        /* Filmele se trimit așa cum sunt, deci le știm mărimea de pe acum.
+           Le oprim aici: altfel urcau douăzeci de minute și abia la final
+           aflau că nu încap. Pozele se micșorează în telefon înainte de
+           trimitere, deci pe ele nu are rost să le măsurăm acum. */
+        if (LIMITE.limita && esteVideo(f) && f.size > LIMITE.limita) {
+          preaMari.push(f.name + ' (' + marimeText(f.size) + ')');
+          return;
+        }
         var item = { id: uid(), sid: sidNou(), file: f, blob: null, name: f.name, nume: '', mesaj: '', isVideo: esteVideo(f), status: 'queued', processed: false, persisted: false, ultimaEroare: null };
         item.row = rowFor(item, f);
         lista.appendChild(item.row);
@@ -197,7 +221,24 @@
       if (sarite > 0) {
         toast(sarite === 1 ? 'O fotografie era deja în listă.' : 'Am sărit ' + sarite + ' fișiere care erau deja în listă.');
       }
+      if (preaMari.length) {
+        var lim = LIMITE.limitaText || marimeText(LIMITE.limita);
+        aratatPreaMari(preaMari, lim);
+      }
       actualizeazaButon();
+    }
+
+    /* Mesaj limpede, cu ce e de făcut — nu doar „prea mare". */
+    function aratatPreaMari(nume, lim) {
+      var vechi = document.getElementById('prea-mari');
+      if (vechi) vechi.remove();
+      var d = document.createElement('div');
+      d.id = 'prea-mari'; d.className = 'alerta';
+      d.innerHTML = '<strong>' + (nume.length === 1 ? 'Un film e prea mare' : nume.length + ' filme sunt prea mari') +
+        '</strong> (limita e ' + esc(lim) + '):<br>' + esc(nume.join(', ')) +
+        '<br><br>Filmează mai scurt, sau schimbă din setările telefonului calitatea pe 1080p în loc de 4K. ' +
+        'Pozele nu sunt afectate.';
+      lista.parentNode.insertBefore(d, lista);
     }
 
     function rowFor(item, previewBlob) {
@@ -299,7 +340,7 @@
              decât bucata curentă, nu tot fișierul */
           for (var t = 0; t < BUCATA_TRIES; t++) {
             rez = await cerereBucati(
-              { actiune: 'bucata', id: item.sid, offset: bazaPr },
+              { actiune: 'bucata', id: item.sid, offset: bazaPr, total: total },
               [{ camp: 'bucata', blob: felie, nume: 'b' }],
               function (incarcat) { onProgress(Math.min(1, (bazaPr + incarcat) / total)); }
             );

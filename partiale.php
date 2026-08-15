@@ -40,6 +40,13 @@ function cap_pagina(string $titlu, string $paginaActiva = ''): void {
 <?php endif; ?>
 <link rel="stylesheet" href="assets/fonturi.css?v=<?= @filemtime(__DIR__ . '/assets/fonturi.css') ?>">
 <link rel="stylesheet" href="assets/style.css?v=<?= @filemtime(__DIR__ . '/assets/style.css') ?>">
+<?php /* Limitele adevărate ale serverului, ca telefonul să nu urce 20 de
+         minute degeaba și să afle abia la final că fișierul e prea mare. */ ?>
+<script>window.NUNTA = {
+  limita: <?= (int)MAX_FILE_SIZE ?>,
+  limitaText: <?= json_encode(format_marime(MAX_FILE_SIZE)) ?>,
+  bucata: <?= (int)dimensiune_bucata() ?>
+};</script>
 </head>
 <body>
 <header class="site-header">

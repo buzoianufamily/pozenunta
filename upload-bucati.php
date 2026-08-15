@@ -121,6 +121,17 @@ if ($actiune === 'bucata') {
     $dimBucata = (int)$_FILES['bucata']['size'];
     $cale      = cale_parte($id);
 
+    /* Clientul ne spune de la început cât are tot fișierul. Dacă nu
+       încape, îl oprim la prima bucată — altfel ar fi urcat degeaba
+       zeci de minute ca să afle abia la sfârșit. */
+    $total = (int)($_POST['total'] ?? 0);
+    if ($total > 0 && $total > MAX_FILE_SIZE) {
+        @unlink($cale);
+        raspunde(['ok' => false, 'preaMare' => true,
+                  'eroare' => 'Filmul are ' . format_marime($total) . ', iar limita este '
+                              . format_marime(MAX_FILE_SIZE) . '.'], 413);
+    }
+
     /* Nu lăsăm un fișier să crească peste limita aplicației. */
     if ($offset + $dimBucata > MAX_FILE_SIZE) {
         @unlink($cale);
