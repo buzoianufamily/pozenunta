@@ -60,6 +60,48 @@ function mesaj_bun_venit(): string {
 }
 
 /* ============================================================
+   JETONUL INVITATULUI (ca să-și poată șterge propriile fișiere)
+   ------------------------------------------------------------
+   Invitatul nu are cont. La prima încărcare îi punem în telefon un
+   cookie cu un cod secret. În baza de date salvăm DOAR amprenta
+   codului (sha256), niciodată codul în sine — dacă cineva ar citi
+   baza de date, tot nu ar putea șterge pozele nimănui.
+
+   Cookie-ul e httpOnly: JavaScript nu îl poate citi, deci nu poate
+   fi furat printr-un script străin strecurat în pagină.
+   ============================================================ */
+define('COOKIE_INVITAT', 'invitat');
+define('COOKIE_INVITAT_ZILE', 400);
+
+function jeton_invitat(bool $creeazaDacaLipsete = false): string {
+    $j = (string)($_COOKIE[COOKIE_INVITAT] ?? '');
+    if (preg_match('/^[a-f0-9]{32,64}$/', $j)) return $j;
+    if (!$creeazaDacaLipsete) return '';
+
+    try {
+        $j = bin2hex(random_bytes(24));
+    } catch (Throwable $e) {
+        $j = hash('sha256', uniqid('', true) . mt_rand());
+    }
+    if (!headers_sent()) {
+        setcookie(COOKIE_INVITAT, $j, [
+            'expires'  => time() + COOKIE_INVITAT_ZILE * 86400,
+            'path'     => '/',
+            'httponly' => true,
+            'samesite' => 'Lax',
+            'secure'   => !empty($_SERVER['HTTPS']),
+        ]);
+    }
+    $_COOKIE[COOKIE_INVITAT] = $j;
+    return $j;
+}
+
+/* Ce se salvează efectiv în baza de date. */
+function amprenta_jeton(string $jeton): ?string {
+    return $jeton === '' ? null : hash('sha256', $jeton);
+}
+
+/* ============================================================
    AUTENTIFICARE ADMIN
    ============================================================ */
 function este_admin(): bool {
@@ -150,8 +192,18 @@ function url_original(array $poza): string {
     return UPLOAD_URL . rawurlencode($poza['nume_fisier']);
 }
 
-/* Construiește un array „curat" pentru JSON */
+/* Construiește un array „curat" pentru JSON.
+   Amprenta invitatului NU pleacă niciodată către pagină — trimitem doar
+   „alMeu", ca telefonul lui să știe unde să arate butonul de ștergere. */
 function poza_pentru_json(array $p): array {
+    static $amprentaMea = false;
+    if ($amprentaMea === false) {
+        $amprentaMea = amprenta_jeton(jeton_invitat(false));
+    }
+    $alMeu = $amprentaMea !== null
+             && !empty($p['jeton'])
+             && hash_equals((string)$p['jeton'], $amprentaMea);
+
     return [
         'id'        => (int)$p['id'],
         'tip'       => $p['tip'],
@@ -161,6 +213,7 @@ function poza_pentru_json(array $p): array {
         'mesaj'     => $p['mesaj'] ?: '',
         'aprecieri' => (int)($p['aprecieri'] ?? 0),
         'data'      => date('d.m.Y H:i', strtotime($p['data_incarcare'])),
+        'alMeu'     => $alMeu,
     ];
 }
 
@@ -170,21 +223,66 @@ function poza_pentru_json(array $p): array {
    „ADD COLUMN IF NOT EXISTS", iar versiunea o ținem în setări
    ca să nu verificăm la fiecare cerere.
    ============================================================ */
+/* Verificări portabile: „ADD COLUMN IF NOT EXISTS" merge pe MariaDB,
+   dar nu pe MySQL. Întrebăm catalogul, ca să meargă pe amândouă. */
+function coloana_exista(string $tabela, string $coloana): bool {
+    try {
+        $st = db()->prepare(
+            'SELECT COUNT(*) FROM information_schema.columns
+             WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?'
+        );
+        $st->execute([$tabela, $coloana]);
+        return (int)$st->fetchColumn() > 0;
+    } catch (Throwable $e) { return true; }   // la dubiu, nu modificăm nimic
+}
+
+function index_exista(string $tabela, string $index): bool {
+    try {
+        $st = db()->prepare(
+            'SELECT COUNT(*) FROM information_schema.statistics
+             WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?'
+        );
+        $st->execute([$tabela, $index]);
+        return (int)$st->fetchColumn() > 0;
+    } catch (Throwable $e) { return true; }
+}
+
+function adauga_index(string $tabela, string $nume, string $coloane): void {
+    if (index_exista($tabela, $nume)) return;
+    try { db()->exec("CREATE INDEX `$nume` ON `$tabela` ($coloane)"); }
+    catch (Throwable $e) { /* index deja existent sub alt nume */ }
+}
+
 function asigura_schema(): void {
     try {
-        if ((int)setare('schema_v', '0') < 3) {
-            db()->exec("ALTER TABLE poze ADD COLUMN IF NOT EXISTS aprecieri INT UNSIGNED NOT NULL DEFAULT 0");
-            db()->exec("CREATE TABLE IF NOT EXISTS urari (
-                id           INT AUTO_INCREMENT PRIMARY KEY,
-                nume         VARCHAR(120) NOT NULL,
-                mesaj        TEXT NOT NULL,
-                aprobat      TINYINT(1) NOT NULL DEFAULT 1,
-                ip           VARCHAR(45) DEFAULT NULL,
-                data_creare  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                INDEX idx_data (data_creare)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-            salveaza_setare('schema_v', '3');
+        if ((int)setare('schema_v', '0') >= 4) return;
+
+        if (!coloana_exista('poze', 'aprecieri')) {
+            db()->exec('ALTER TABLE poze ADD COLUMN aprecieri INT UNSIGNED NOT NULL DEFAULT 0');
         }
+        /* Amprenta invitatului care a încărcat fișierul. */
+        if (!coloana_exista('poze', 'jeton')) {
+            db()->exec('ALTER TABLE poze ADD COLUMN jeton VARCHAR(64) DEFAULT NULL');
+        }
+
+        db()->exec("CREATE TABLE IF NOT EXISTS urari (
+            id           INT AUTO_INCREMENT PRIMARY KEY,
+            nume         VARCHAR(120) NOT NULL,
+            mesaj        TEXT NOT NULL,
+            aprobat      TINYINT(1) NOT NULL DEFAULT 1,
+            ip           VARCHAR(45) DEFAULT NULL,
+            data_creare  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_data (data_creare)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        /* Indexuri pentru galerie: fără ele, fiecare derulare sortează
+           toată tabela. Se simte când sute de oameni se uită deodată. */
+        adauga_index('poze',  'idx_galerie',   'aprobat, data_incarcare, id');
+        adauga_index('poze',  'idx_apreciate', 'aprobat, aprecieri, data_incarcare');
+        adauga_index('poze',  'idx_jeton',     'jeton');
+        adauga_index('urari', 'idx_aprobat',   'aprobat, data_creare');
+
+        salveaza_setare('schema_v', '4');
     } catch (Throwable $e) { /* tabela poate lipsi înainte de setup */ }
 }
 

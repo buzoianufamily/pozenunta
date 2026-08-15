@@ -41,6 +41,8 @@ cap_pagina('Galerie', 'galerie');
       <span id="lb-like-n">0</span>
     </button>
     <a class="lb-link" id="lb-download" download>Descarcă</a>
+    <!-- apare doar la fișierele încărcate de pe acest telefon -->
+    <button class="lb-link lb-sterge" id="lb-sterge" hidden>Șterge</button>
   </div>
   <button class="lb-btn lb-prev" id="lb-prev" aria-label="Înapoi">
     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>

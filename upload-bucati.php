@@ -225,8 +225,8 @@ if ($actiune === 'finalizeaza') {
     try {
         asigura_schema();
         $stmt = db()->prepare(
-            'INSERT INTO poze (nume_fisier, nume_original, nume_invitat, mesaj, tip, marime, aprobat, ip)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO poze (nume_fisier, nume_original, nume_invitat, mesaj, tip, marime, aprobat, ip, jeton)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
             $numeFisier,
@@ -237,6 +237,7 @@ if ($actiune === 'finalizeaza') {
             $dim,
             moderare_activa() ? 0 : 1,
             $_SERVER['REMOTE_ADDR'] ?? null,
+            amprenta_jeton(jeton_invitat(true)),
         ]);
     } catch (Throwable $e) {
         @unlink($destinatie);

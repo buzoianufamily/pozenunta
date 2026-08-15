@@ -48,6 +48,8 @@ if (empty($fisiere)) {
 
 $ip          = $_SERVER['REMOTE_ADDR'] ?? null;
 $aprobat     = moderare_activa() ? 0 : 1;
+/* Codul secret al invitatului, ca să-și poată șterge singur fișierele. */
+$amprenta    = amprenta_jeton(jeton_invitat(true));
 $reusite     = 0;
 $erori       = [];
 $ext_imagini = extensii_imagini();
@@ -55,8 +57,8 @@ $ext_video   = extensii_video();
 $ext_permise = extensii_permise();
 
 $stmt = db()->prepare(
-    'INSERT INTO poze (nume_fisier, nume_original, nume_invitat, mesaj, tip, marime, aprobat, ip)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO poze (nume_fisier, nume_original, nume_invitat, mesaj, tip, marime, aprobat, ip, jeton)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
 );
 
 foreach ($fisiere as $f) {
@@ -112,6 +114,7 @@ foreach ($fisiere as $f) {
             (int)$f['size'],
             $aprobat,
             $ip,
+            $amprenta,
         ]);
         $reusite++;
     } catch (Throwable $e) {

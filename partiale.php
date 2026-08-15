@@ -22,9 +22,7 @@ function cap_pagina(string $titlu, string $paginaActiva = ''): void {
 <?php else: ?>
 <meta name="twitter:card" content="summary">
 <?php endif; ?>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/fonturi.css?v=<?= @filemtime(__DIR__ . '/assets/fonturi.css') ?>">
 <link rel="stylesheet" href="assets/style.css?v=<?= @filemtime(__DIR__ . '/assets/style.css') ?>">
 </head>
 <body>

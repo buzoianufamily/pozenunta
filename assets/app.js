@@ -53,7 +53,9 @@
   var MAX_DIM = 2560, CALITATE = 0.85, heicProm = null;
   function incarcaHeic() {
     if (heicProm) return heicProm;
-    heicProm = new Promise(function (res, rej) { var s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js'; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+    /* Găzduit local: la nuntă, WiFi-ul sălii poate fi lent sau filtrat,
+       iar fără această bibliotecă pozele de pe iPhone nu s-ar încărca. */
+    heicProm = new Promise(function (res, rej) { var s = document.createElement('script'); s.src = 'assets/vendor/heic2any.min.js'; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
     return heicProm;
   }
   function proceseazaImagine(file) {
@@ -369,9 +371,26 @@
       btn.parentNode.appendChild(b);
     }
 
+    /* ---------- ține minte numele invitatului ----------
+       Cine urcă poze de mai multe ori în seară nu trebuie să-și scrie
+       numele de fiecare dată. Mesajul NU se reține: e legat de poza
+       de atunci, nu de persoană. */
+    var CHEIE_NUME = 'nunta_nume_invitat';
+    var campNume = document.getElementById('nume');
+    if (campNume) {
+      try {
+        var salvat = localStorage.getItem(CHEIE_NUME);
+        if (salvat && !campNume.value) campNume.value = salvat;
+      } catch (e) {}
+    }
+
     btn.addEventListener('click', function () {
-      var nume = (document.getElementById('nume').value || '').trim();
+      var nume = (campNume ? campNume.value : '').trim();
       var mesaj = (document.getElementById('mesaj').value || '').trim();
+      try {
+        if (nume) localStorage.setItem(CHEIE_NUME, nume);
+        else localStorage.removeItem(CHEIE_NUME);
+      } catch (e) {}
       coada.forEach(function (it) { if (it.status === 'queued') { it.nume = nume; it.mesaj = mesaj; } });
       pornestePool();
     });
@@ -475,7 +494,17 @@
     /* ---- lightbox ---- */
     var lb = document.getElementById('lightbox'), lbCont = document.getElementById('lb-continut'), lbCap = document.getElementById('lb-caption'), lbDl = document.getElementById('lb-download');
     var lbLike = document.getElementById('lb-like'), lbLikeN = document.getElementById('lb-like-n');
+    var lbSterge = document.getElementById('lb-sterge');
     var idxCurent = 0, lbIdActual = null;
+
+    /* Numele cu care se salvează fișierul pe telefonul invitatului.
+       Pe server are un nume aleatoriu; aici îi punem unul cu sens. */
+    function numeDescarcare(p) {
+      var ext = (p.original.split('.').pop() || 'jpg').split(/[?#]/)[0];
+      var baza = (document.title.split('·').pop() || 'nunta').trim()
+                  .replace(/\s+/g, '-').replace(/[^\w\-]/g, '').toLowerCase();
+      return (baza || 'nunta') + '-' + p.id + '.' + ext;
+    }
 
     function randeaza(i) {
       var p = toate[i]; if (!p) return; idxCurent = i; lbIdActual = p.id;
@@ -486,8 +515,41 @@
       if (p.nume) cap += '<div class="nume">' + esc(p.nume) + '</div>';
       if (p.mesaj) cap += '<div class="mesaj">' + esc(p.mesaj) + '</div>';
       cap += '<div class="data">' + esc(p.data) + '</div>';
-      lbCap.innerHTML = cap; lbDl.href = p.original;
+      lbCap.innerHTML = cap;
+      lbDl.href = p.original;
+      lbDl.setAttribute('download', numeDescarcare(p));
       lbLikeN.textContent = p.aprecieri; lbLike.classList.toggle('activ', esteApreciat(p.id));
+      if (lbSterge) lbSterge.hidden = !p.alMeu;
+    }
+
+    /* Ștergerea propriului fișier. Serverul verifică din nou dreptul —
+       aici doar nu arătăm butonul unde nu are ce căuta. */
+    function stergeAlMeu(id) {
+      var p = null, idx = -1;
+      for (var i = 0; i < toate.length; i++) { if (toate[i].id === id) { p = toate[i]; idx = i; break; } }
+      if (!p || !p.alMeu) return;
+      var ce = p.tip === 'video' ? 'filmul' : 'fotografia';
+      var confirmat = p.tip === 'video'
+        ? 'Filmul a fost șters din album.'
+        : 'Fotografia a fost ștearsă din album.';
+      if (!window.confirm('Ștergi ' + ce + ' din album? Această acțiune nu poate fi anulată.')) return;
+
+      var fd = new FormData(); fd.append('id', String(id));
+      fetch('sterge-poza.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d || !d.ok) { toast((d && d.eroare) || 'Nu s-a putut șterge.'); return; }
+          toate.splice(idx, 1);
+          var el = galerieEl.querySelector('.poza[data-id="' + id + '"]');
+          if (el) el.remove();
+          /* indicii din DOM se schimbă după ștergere — le refacem */
+          Array.prototype.forEach.call(galerieEl.querySelectorAll('.poza'), function (n, k) {
+            n.setAttribute('data-idx', k);
+          });
+          inchide();
+          toast(confirmat);
+        })
+        .catch(function () { toast('Conexiune întreruptă. Încearcă din nou.'); });
     }
     function deschideLightbox(i) { randeaza(i); lb.classList.add('deschis'); lb.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden'; }
     function inchide() { lb.classList.remove('deschis'); lb.setAttribute('aria-hidden', 'true'); lbCont.innerHTML = ''; lbIdActual = null; document.body.style.overflow = ''; }
@@ -501,6 +563,7 @@
     document.getElementById('lb-prev').addEventListener('click', function (e) { e.stopPropagation(); navig(-1); });
     document.getElementById('lb-next').addEventListener('click', function (e) { e.stopPropagation(); navig(1); });
     lbLike.addEventListener('click', function (e) { e.stopPropagation(); if (lbIdActual != null) comutaLike(lbIdActual); });
+    if (lbSterge) lbSterge.addEventListener('click', function (e) { e.stopPropagation(); if (lbIdActual != null) stergeAlMeu(lbIdActual); });
     lb.addEventListener('click', function (e) { if (e.target === lb || e.target === lbCont) inchide(); });
     document.addEventListener('keydown', function (e) { if (!lb.classList.contains('deschis')) return; if (e.key === 'Escape') inchide(); else if (e.key === 'ArrowLeft') navig(-1); else if (e.key === 'ArrowRight') navig(1); });
   }

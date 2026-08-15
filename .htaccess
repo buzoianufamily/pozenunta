@@ -25,6 +25,8 @@ AddDefaultCharset UTF-8
   ExpiresByType video/mp4  "access plus 30 days"
   ExpiresByType text/css   "access plus 7 days"
   ExpiresByType application/javascript "access plus 7 days"
+  # fonturile găzduite local nu se schimbă niciodată
+  ExpiresByType font/woff2 "access plus 1 year"
 </IfModule>
 
 # Comprimare text
