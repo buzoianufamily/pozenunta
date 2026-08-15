@@ -2,6 +2,15 @@
 require_once __DIR__ . '/functions.php';
 
 function cap_pagina(string $titlu, string $paginaActiva = ''): void {
+    /* Codul care recunoaște invitatul se creează AICI, la afișarea paginii,
+       nu în cererile de încărcare. Motivul: fișierele pleacă mai multe
+       deodată, iar dacă niciuna nu găsește cookie-ul, fiecare își face
+       codul ei — și atunci invitatul rămâne cu un singur cod din trei,
+       iar restul pozelor lui nu mai sunt ale nimănui.
+       Aici cererea e una singură, deci codul iese unul singur.
+       Trebuie apelat înainte de orice afișare, ca antetul să poată pleca. */
+    jeton_invitat(true);
+
     $mire = h(NUME_MIRE); $mireasa = h(NUME_MIREASA);
     ?><!doctype html>
 <html lang="ro">
