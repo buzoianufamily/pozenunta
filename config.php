@@ -20,7 +20,7 @@ define('DB_CHARSET', 'utf8mb4');
 define('NUME_MIRE',    'Răzvan');
 define('NUME_MIREASA', 'Maria');
 define('DATA_NUNTII',  '22 august 2026');
-define('SITE_URL',     'https://poze.buzonnect.ro'); // folosit la codul QR
+define('SITE_URL',     'https://nunta.razvanbuzoianu.ro'); // folosit la codul QR
 
 /* ---------- 3. USERUL SUPREM (admin) ----------
    Autentificarea se face cu datele de mai jos. Le schimbi DIRECT aici,

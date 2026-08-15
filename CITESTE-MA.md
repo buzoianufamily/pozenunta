@@ -1,7 +1,7 @@
 # Album de nuntă — Răzvan & Maria · ghid (versiunea 2)
 
 Aplicație de poze/filme pentru nuntă, pentru găzduire pe cPanel (RoMarg).
-Domeniu: **poze.buzonnect.ro** · Bază de date: **r140100buzo_pozenunta**.
+Domeniu: **nunta.razvanbuzoianu.ro** · Bază de date: **r140100buzo_pozenunta**.
 
 ---
 
@@ -23,10 +23,10 @@ Domeniu: **poze.buzonnect.ro** · Bază de date: **r140100buzo_pozenunta**.
 
 ## 2. Dacă ai deja site-ul instalat (ACTUALIZARE)
 
-1. **Încarcă toate fișierele** din arhivă în `public_html` (folderul lui poze.buzonnect.ro), suprascriind fișierele vechi. În cPanel: File Manager -> Upload arhiva, apoi Extract.
+1. **Încarcă toate fișierele** din arhivă în `public_html` (folderul lui nunta.razvanbuzoianu.ro), suprascriind fișierele vechi. În cPanel: File Manager -> Upload arhiva, apoi Extract.
 2. **Deschide `config.php`** și pune la loc datele tale (sunt doar câteva rânduri):
    - `DB_NAME`, `DB_USER`, `DB_PASS` — exact ca înainte;
-   - `SITE_URL` — `https://poze.buzonnect.ro`;
+   - `SITE_URL` — `https://nunta.razvanbuzoianu.ro`;
    - `ADMIN_USER` și **`ADMIN_PASS`** — utilizatorul și parola cu care intri în panou (acum se setează aici!).
 
    Atenție: dacă păstrezi vechiul `config.php`, autentificarea NU va merge, pentru că s-a redenumit `ADMIN_PASS_INITIALA` -> `ADMIN_PASS`. Cel mai sigur: folosește noul `config.php` și completează cele 5 valori.
@@ -40,7 +40,7 @@ Domeniu: **poze.buzonnect.ro** · Bază de date: **r140100buzo_pozenunta**.
 
 1. Urcă toate fișierele în `public_html`.
 2. Editează `config.php`: datele bazei de date, `SITE_URL`, `ADMIN_USER`, `ADMIN_PASS`.
-3. Deschide în browser **o singură dată** `https://poze.buzonnect.ro/setup.php` (creează tabelele).
+3. Deschide în browser **o singură dată** `https://nunta.razvanbuzoianu.ro/setup.php` (creează tabelele).
 4. **Șterge `setup.php`** după ce a mers.
 5. Gata — pagina de start e `index.php`.
 
@@ -48,7 +48,7 @@ Domeniu: **poze.buzonnect.ro** · Bază de date: **r140100buzo_pozenunta**.
 
 ## 4. Cum intri ca administrator
 
-- Mergi la `https://poze.buzonnect.ro/login.php`.
+- Mergi la `https://nunta.razvanbuzoianu.ro/login.php`.
 - Utilizator și parolă = `ADMIN_USER` / `ADMIN_PASS` din `config.php`.
 - Ca să schimbi parola, **editezi `config.php`** (rândul `ADMIN_PASS`).
 
@@ -86,5 +86,5 @@ Casă de piatră!
 
 - **Miniatură (poster) pentru filme:** la încărcare, telefonul extrage primul cadru al filmului și îl trimite ca miniatură — în galerie filmele apar cu o imagine reală, nu cu un dreptunghi gol. (Dacă pe vreun telefon nu reușește, filmul tot se încarcă, doar fără poster.)
 - **Indicator de spațiu în panou:** o bară arată cât disc e folosit din total și cât a mai rămas liber. Pragul total se setează în `config.php` la `DISK_QUOTA_GB` (acum 10). **Când cumperi spațiu suplimentar, mărește această valoare** ca bara să fie corectă.
-- **Imagine de partajare:** când trimiți linkul `poze.buzonnect.ro` pe WhatsApp/Facebook, apar numele „Răzvan & Maria" și fotografia de cuplu (după ce o încarci din panou). Notă: WhatsApp/Facebook țin în cache previzualizarea; dacă ai trimis deja linkul înainte de a pune coperta, poate dura sau poți folosi un debugger de linkuri ca să reîmprospătezi previzualizarea.
+- **Imagine de partajare:** când trimiți linkul `nunta.razvanbuzoianu.ro` pe WhatsApp/Facebook, apar numele „Răzvan & Maria" și fotografia de cuplu (după ce o încarci din panou). Notă: WhatsApp/Facebook țin în cache previzualizarea; dacă ai trimis deja linkul înainte de a pune coperta, poate dura sau poți folosi un debugger de linkuri ca să reîmprospătezi previzualizarea.
 - **Culori:** verdele de brand e acum uniform `#0D3328` peste tot (butoane, titluri), la fel ca bara de admin.
