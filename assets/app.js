@@ -24,9 +24,24 @@
   function likeSet() { try { return new Set(JSON.parse(localStorage.getItem(CHEIE_LIKE) || '[]')); } catch (e) { return new Set(); } }
   function salveazaLike(set) { try { localStorage.setItem(CHEIE_LIKE, JSON.stringify(Array.prototype.slice.call(set))); } catch (e) {} }
   function esteApreciat(id) { return likeSet().has(id); }
+
+  /* Serverul e sursa de adevăr: ține aprecierile pe invitat, nu pe
+     telefon. Sincronizăm memoria locală cu ce spune el, ca inimile să
+     arate corect și de pe alt dispozitiv. */
+  function sincronizeazaLike(poze) {
+    var set = likeSet(), schimbat = false;
+    poze.forEach(function (p) {
+      if (typeof p.apreciat !== 'boolean') return;
+      if (p.apreciat && !set.has(p.id)) { set.add(p.id); schimbat = true; }
+      else if (!p.apreciat && set.has(p.id)) { set.delete(p.id); schimbat = true; }
+    });
+    if (schimbat) salveazaLike(set);
+  }
+
   function trimiteLike(id, val) {
     var fd = new FormData(); fd.append('id', id); fd.append('val', val);
-    return fetch('like.php', { method: 'POST', body: fd }).then(function (r) { return r.json(); }).catch(function () { return { ok: false }; });
+    return fetch('like.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+      .then(function (r) { return r.json(); }).catch(function () { return { ok: false }; });
   }
 
   /* ============================================================
@@ -194,7 +209,9 @@
       }
       rand.innerHTML = miniHtml +
         '<div class="meta"><div class="nume">' + esc(item.name) + '</div>' +
-        '<div class="stare">În așteptare</div><div class="bara"><i></i></div></div>';
+        '<div class="stare" role="status">În așteptare</div>' +
+        '<div class="bara" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"' +
+        ' aria-label="Progres încărcare ' + esc(item.name) + '"><i></i></div></div>';
       item.row = rand;
       return rand;
     }
@@ -203,7 +220,12 @@
       if (!item.row) return;
       var s = item.row.querySelector('.stare'); var b = item.row.querySelector('.bara > i');
       if (s) s.textContent = text;
-      if (b && progres != null) b.style.width = Math.round(progres * 100) + '%';
+      if (b && progres != null) {
+        var proc = Math.round(progres * 100);
+        b.style.width = proc + '%';
+        var bara = item.row.querySelector('.bara');
+        if (bara) bara.setAttribute('aria-valuenow', String(proc));
+      }
     }
 
     function actualizeazaButon() {
@@ -509,7 +531,7 @@
       seIncarca = true; miniLoader.style.display = 'block';
       return fetch('api.php?actiune=lista&sortare=' + sortare + '&pagina=' + (pagina + 1))
         .then(function (r) { return r.json(); })
-        .then(function (d) { if (d && d.ok) { pagina = d.pagina; if (d.poze.length) { niciUna = false; adaugaPoze(d.poze); } maiSunt = d.maiSunt; } else { maiSunt = false; } })
+        .then(function (d) { if (d && d.ok) { pagina = d.pagina; if (d.poze.length) { niciUna = false; sincronizeazaLike(d.poze); adaugaPoze(d.poze); } maiSunt = d.maiSunt; } else { maiSunt = false; } })
         .catch(function () { maiSunt = false; })
         .finally(function () { seIncarca = false; miniLoader.style.display = 'none'; if (niciUna) golEl.style.display = 'block'; if (maiSunt && document.body.scrollHeight <= window.innerHeight + 200) incarcaPagina(); });
     }
@@ -581,8 +603,28 @@
         })
         .catch(function () { toast('Conexiune întreruptă. Încearcă din nou.'); });
     }
-    function deschideLightbox(i) { randeaza(i); lb.classList.add('deschis'); lb.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden'; }
-    function inchide() { lb.classList.remove('deschis'); lb.setAttribute('aria-hidden', 'true'); lbCont.innerHTML = ''; lbIdActual = null; document.body.style.overflow = ''; }
+    /* Focalizarea rămâne în lightbox cât e deschis: altfel tastatura
+       „iese" pe legăturile din spatele lui, care nu se văd. */
+    var focalizatInainte = null;
+    function focalizabile() {
+      return Array.prototype.filter.call(
+        lb.querySelectorAll('button, a[href], video, [tabindex]:not([tabindex="-1"])'),
+        function (el) { return !el.hasAttribute('hidden') && el.offsetParent !== null; }
+      );
+    }
+    function deschideLightbox(i) {
+      focalizatInainte = document.activeElement;
+      randeaza(i);
+      lb.classList.add('deschis'); lb.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      var f = focalizabile(); if (f.length) f[0].focus();
+    }
+    function inchide() {
+      lb.classList.remove('deschis'); lb.setAttribute('aria-hidden', 'true');
+      lbCont.innerHTML = ''; lbIdActual = null; document.body.style.overflow = '';
+      if (focalizatInainte && focalizatInainte.focus) focalizatInainte.focus();
+      focalizatInainte = null;
+    }
     function navig(dir) {
       var nou = idxCurent + dir;
       if (nou < 0) nou = toate.length - 1;
@@ -595,7 +637,21 @@
     lbLike.addEventListener('click', function (e) { e.stopPropagation(); if (lbIdActual != null) comutaLike(lbIdActual); });
     if (lbSterge) lbSterge.addEventListener('click', function (e) { e.stopPropagation(); if (lbIdActual != null) stergeAlMeu(lbIdActual); });
     lb.addEventListener('click', function (e) { if (e.target === lb || e.target === lbCont) inchide(); });
-    document.addEventListener('keydown', function (e) { if (!lb.classList.contains('deschis')) return; if (e.key === 'Escape') inchide(); else if (e.key === 'ArrowLeft') navig(-1); else if (e.key === 'ArrowRight') navig(1); });
+    document.addEventListener('keydown', function (e) {
+      if (!lb.classList.contains('deschis')) return;
+      if (e.key === 'Escape') { inchide(); return; }
+      if (e.key === 'ArrowLeft')  { navig(-1); return; }
+      if (e.key === 'ArrowRight') { navig(1);  return; }
+      if (e.key !== 'Tab') return;
+
+      /* Tab circulă doar printre elementele din lightbox. */
+      var f = focalizabile();
+      if (!f.length) { e.preventDefault(); return; }
+      var primul = f[0], ultimul = f[f.length - 1];
+      if (!lb.contains(document.activeElement)) { e.preventDefault(); primul.focus(); return; }
+      if (e.shiftKey && document.activeElement === primul) { e.preventDefault(); ultimul.focus(); }
+      else if (!e.shiftKey && document.activeElement === ultimul) { e.preventDefault(); primul.focus(); }
+    });
   }
 
   /* ============================================================

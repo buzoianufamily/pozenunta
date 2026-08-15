@@ -1,0 +1,3 @@
+# Album privat de nuntă — nu dorim indexare în motoarele de căutare.
+User-agent: *
+Disallow: /

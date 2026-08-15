@@ -33,6 +33,11 @@ if ($actiune === 'lista') {
 
     $poze = array_map('poza_pentru_json', $randuri);
 
+    /* Inimile deja apăsate de acest invitat — sursa de adevăr e serverul,
+       nu memoria telefonului, deci se văd corect și de pe alt dispozitiv. */
+    $mele = aprecieri_mele(array_column($randuri, 'id'));
+    foreach ($poze as $i => $p) { $poze[$i]['apreciat'] = isset($mele[$p['id']]); }
+
     echo json_encode([
         'ok'      => true,
         'poze'    => $poze,

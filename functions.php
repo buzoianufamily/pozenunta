@@ -261,7 +261,7 @@ function adauga_index(string $tabela, string $nume, string $coloane): void {
 
 function asigura_schema(): void {
     try {
-        if ((int)setare('schema_v', '0') >= 5) return;
+        if ((int)setare('schema_v', '0') >= 6) return;
 
         if (!coloana_exista('poze', 'aprecieri')) {
             db()->exec('ALTER TABLE poze ADD COLUMN aprecieri INT UNSIGNED NOT NULL DEFAULT 0');
@@ -289,12 +289,42 @@ function asigura_schema(): void {
            toată tabela. Se simte când sute de oameni se uită deodată. */
         adauga_index('poze',  'idx_galerie',   'aprobat, data_incarcare, id');
         adauga_index('poze',  'idx_apreciate', 'aprobat, aprecieri, data_incarcare');
+        /* Proprietarul urării, ca invitatul să și-o poată șterge. */
+        if (!coloana_exista('urari', 'jeton')) {
+            db()->exec('ALTER TABLE urari ADD COLUMN jeton VARCHAR(64) DEFAULT NULL');
+        }
+
+        /* Aprecierile se numără pe server, câte una per invitat și poză.
+           Cheia primară dublă face imposibilă aprecierea de două ori. */
+        db()->exec("CREATE TABLE IF NOT EXISTS aprecieri (
+            poza_id     INT NOT NULL,
+            jeton       VARCHAR(64) NOT NULL,
+            data_creare TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (poza_id, jeton),
+            INDEX idx_poza (poza_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
         adauga_index('poze',  'idx_jeton',     'jeton');
         adauga_index('poze',  'idx_amprenta',  'amprenta_fisier');
         adauga_index('urari', 'idx_aprobat',   'aprobat, data_creare');
+        adauga_index('urari', 'idx_jeton',     'jeton');
 
-        salveaza_setare('schema_v', '5');
+        salveaza_setare('schema_v', '6');
     } catch (Throwable $e) { /* tabela poate lipsi înainte de setup */ }
+}
+
+/* Ce a apreciat deja invitatul, dintr-o listă de poze. O singură
+   interogare pentru toată pagina, nu una per poză. */
+function aprecieri_mele(array $ids): array {
+    $amprenta = amprenta_jeton(jeton_invitat(false));
+    if ($amprenta === null || empty($ids)) return [];
+    $ids = array_values(array_unique(array_map('intval', $ids)));
+    $sem = implode(',', array_fill(0, count($ids), '?'));
+    try {
+        $st = db()->prepare("SELECT poza_id FROM aprecieri WHERE jeton = ? AND poza_id IN ($sem)");
+        $st->execute(array_merge([$amprenta], $ids));
+        return array_flip(array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN)));
+    } catch (Throwable $e) { return []; }
 }
 
 /* ============================================================

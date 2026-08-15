@@ -82,6 +82,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($vechi && is_file(UPLOAD_DIR . $vechi)) @unlink(UPLOAD_DIR . $vechi);
             salveaza_setare('cover', '');
             $notif = ['ok', 'Fotografia de cuplu a fost ștearsă.'];
+
+        /* ---------- urări ---------- */
+        } elseif ($actiune === 'sterge_urare') {
+            $pdo->prepare('DELETE FROM urari WHERE id = ?')->execute([(int)($_POST['id'] ?? 0)]);
+            if ($ajax) raspunde_json(['ok' => true]);
+            $notif = ['ok', 'Urarea a fost ștearsă.'];
+        } elseif ($actiune === 'aproba_urare') {
+            $pdo->prepare('UPDATE urari SET aprobat = 1 WHERE id = ?')->execute([(int)($_POST['id'] ?? 0)]);
+            if ($ajax) raspunde_json(['ok' => true]);
+            $notif = ['ok', 'Urarea a fost aprobată.'];
         }
     }
 }
@@ -95,6 +105,17 @@ $nrVideo   = (int)$pdo->query("SELECT COUNT(*) FROM poze WHERE tip='video'")->fe
 $nrInvitati= (int)$pdo->query("SELECT COUNT(DISTINCT nume_invitat) FROM poze WHERE nume_invitat IS NOT NULL AND nume_invitat <> ''")->fetchColumn();
 $spatiu    = (int)$pdo->query('SELECT COALESCE(SUM(marime),0) FROM poze')->fetchColumn();
 $nrAstept  = (int)$pdo->query('SELECT COUNT(*) FROM poze WHERE aprobat=0')->fetchColumn();
+
+/* Urările: cele neaprobate primele, ca să sară în ochi. */
+$urariAdmin = []; $nrUrari = 0; $nrUrariAstept = 0;
+try {
+    $nrUrari       = (int)$pdo->query('SELECT COUNT(*) FROM urari')->fetchColumn();
+    $nrUrariAstept = (int)$pdo->query('SELECT COUNT(*) FROM urari WHERE aprobat=0')->fetchColumn();
+    $urariAdmin    = $pdo->query(
+        'SELECT id, nume, mesaj, aprobat, data_creare FROM urari
+         ORDER BY aprobat ASC, data_creare DESC, id DESC LIMIT 200'
+    )->fetchAll();
+} catch (Throwable $e) { /* tabela poate lipsi la prima rulare */ }
 $quotaBytes  = DISK_QUOTA_GB * 1024 * 1024 * 1024;
 $procentDisc = $quotaBytes > 0 ? min(100, (int)round($spatiu / $quotaBytes * 100)) : 0;
 $liberBytes  = max(0, $quotaBytes - $spatiu);
@@ -238,6 +259,43 @@ $poze = $stmt->fetchAll();
       </div>
     </div>
 
+    <!-- CARTE DE URĂRI -->
+    <div class="panou">
+      <h2>Carte de urări</h2>
+      <p class="ajutor">
+        <?= $nrUrari ?> <?= $nrUrari === 1 ? 'urare' : 'urări' ?>
+        <?php if ($nrUrariAstept > 0): ?>
+          · <strong><?= $nrUrariAstept ?> în așteptare</strong>
+        <?php endif; ?>
+        <?php if ($nrUrari > 200): ?> · se arată cele mai recente 200<?php endif; ?>
+      </p>
+
+      <?php if (empty($urariAdmin)): ?>
+        <p class="ajutor">Nicio urare încă.</p>
+      <?php else: ?>
+        <div class="urari-admin">
+          <?php foreach ($urariAdmin as $u): ?>
+            <div class="urare-rand<?= $u['aprobat'] ? '' : ' neaprobata' ?>" data-urare="<?= (int)$u['id'] ?>">
+              <div class="ur-continut">
+                <div class="ur-cap">
+                  <strong><?= h($u['nume']) ?></strong>
+                  <span class="ur-data"><?= date('d.m.Y H:i', strtotime($u['data_creare'])) ?></span>
+                  <?php if (!$u['aprobat']): ?><span class="ur-eticheta">în așteptare</span><?php endif; ?>
+                </div>
+                <div class="ur-mesaj"><?= nl2br(h($u['mesaj'])) ?></div>
+              </div>
+              <div class="ur-actiuni">
+                <?php if (!$u['aprobat']): ?>
+                  <button class="btn btn-mic btn-primar" data-aproba-urare="<?= (int)$u['id'] ?>">Aprobă</button>
+                <?php endif; ?>
+                <button class="btn btn-mic btn-ghost" data-sterge-urare="<?= (int)$u['id'] ?>">Șterge</button>
+              </div>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+    </div>
+
     <!-- GALERIE ADMIN -->
     <div class="panou">
       <h2>Toate fotografiile</h2>
@@ -333,6 +391,37 @@ $poze = $stmt->fetchAll();
       .then(function(r){return r.json();}).then(function(d){ callback(d && d.ok); })
       .catch(function(){ callback(false); });
   }
+
+  // urări: aprobare și ștergere
+  document.querySelectorAll('[data-aproba-urare]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var id = b.getAttribute('data-aproba-urare');
+      b.disabled = true;
+      actiuneSingulara('aproba_urare', id, function(ok){
+        if (!ok) { b.disabled = false; toast('Nu s-a putut aproba.'); return; }
+        var rand = document.querySelector('[data-urare="' + id + '"]');
+        if (rand) {
+          rand.classList.remove('neaprobata');
+          var et = rand.querySelector('.ur-eticheta'); if (et) et.remove();
+          b.remove();
+        }
+        toast('Urarea a fost aprobată.');
+      });
+    });
+  });
+  document.querySelectorAll('[data-sterge-urare]').forEach(function(b){
+    b.addEventListener('click', function(){
+      if (!confirm('Sigur ștergi această urare? Acțiunea nu poate fi anulată.')) return;
+      var id = b.getAttribute('data-sterge-urare');
+      b.disabled = true;
+      actiuneSingulara('sterge_urare', id, function(ok){
+        if (!ok) { b.disabled = false; toast('Nu s-a putut șterge.'); return; }
+        var rand = document.querySelector('[data-urare="' + id + '"]');
+        if (rand) rand.remove();
+        toast('Urarea a fost ștearsă.');
+      });
+    });
+  });
 
   // ștergere individuală
   document.querySelectorAll('[data-sterge]').forEach(function(b){

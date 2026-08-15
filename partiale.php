@@ -9,6 +9,10 @@ function cap_pagina(string $titlu, string $paginaActiva = ''): void {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#FBF7EF">
+<?php /* Album privat de familie: nu-l vrem în rezultatele căutărilor.
+         Previzualizarea de pe WhatsApp/Facebook funcționează în continuare,
+         pentru că nu trece prin indexarea motoarelor de căutare. */ ?>
+<meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
