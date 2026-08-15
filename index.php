@@ -39,10 +39,10 @@ cap_pagina('Acasă', 'acasa');
     </div>
     <div class="galerie">
       <?php foreach ($pozeRecente as $p): ?>
-        <div class="poza vizibil" onclick="location.href='galerie.php'">
+        <a class="poza vizibil" href="galerie.php" aria-label="Vezi galeria">
           <img loading="lazy" src="<?= h(url_previzualizare($p)) ?>" alt="">
           <?php if ($p['tip'] === 'video'): ?><div class="play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div><?php endif; ?>
-        </div>
+        </a>
       <?php endforeach; ?>
     </div>
     <div style="text-align:center;margin-top:20px"><a class="btn btn-ghost" href="galerie.php">Vezi toată galeria</a></div>

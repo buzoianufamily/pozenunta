@@ -213,6 +213,109 @@ try {
 }
 
 /* ============================================================
+   4b. STRUCTURA BAZEI DE DATE
+   ------------------------------------------------------------
+   Migrarea automată e scrisă să nu dărâme site-ul dacă ceva nu
+   merge: înghite erorile în tăcere. Bine pentru invitați, dar
+   înseamnă că numărul de versiune poate fi salvat chiar dacă un
+   index n-a apucat să se creeze. De aceea verificăm structurile
+   una câte una, nu versiunea.
+
+   Ce lipsește apare mai jos ca text SQL, gata de rulat în
+   phpMyAdmin — cazul tipic e un utilizator de bază de date fără
+   drept de ALTER.
+   ============================================================ */
+$sqlDeRulat = [];
+
+if (isset($pdo)) {
+    $cauta = function (string $sql, array $val) use ($pdo): ?int {
+        try {
+            $st = $pdo->prepare($sql);
+            $st->execute($val);
+            return (int)$st->fetchColumn();
+        } catch (Throwable $e) { return null; }   // null = n-am putut verifica
+    };
+    $areTabela = fn(string $t) => $cauta(
+        'SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?', [$t]);
+    $areColoana = fn(string $t, string $c) => $cauta(
+        'SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?', [$t, $c]);
+    $areIndex = fn(string $t, string $i) => $cauta(
+        'SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?', [$t, $i]);
+
+    /* Ce are nevoie aplicația, cu reparația alături. */
+    $sqlAprecieri = "CREATE TABLE IF NOT EXISTS aprecieri (\n"
+        . "  poza_id     INT NOT NULL,\n"
+        . "  jeton       VARCHAR(64) NOT NULL,\n"
+        . "  data_creare TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n"
+        . "  PRIMARY KEY (poza_id, jeton),\n"
+        . "  INDEX idx_poza (poza_id)\n"
+        . ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;";
+
+    $asteptat = [
+        ['tabela',  'poze',      null,              'fotografiile și filmele',      null],
+        ['tabela',  'setari',    null,              'setările din panou',           null],
+        ['tabela',  'urari',     null,              'cartea de urări',              null],
+        ['tabela',  'aprecieri', null,              'inimioarele, una per invitat', $sqlAprecieri],
+
+        ['coloana', 'poze',  'aprecieri',       'numărul de aprecieri',
+            'ALTER TABLE poze ADD COLUMN aprecieri INT UNSIGNED NOT NULL DEFAULT 0;'],
+        ['coloana', 'poze',  'jeton',           'cine a încărcat (pentru ștergere)',
+            'ALTER TABLE poze ADD COLUMN jeton VARCHAR(64) DEFAULT NULL;'],
+        ['coloana', 'poze',  'amprenta_fisier', 'depistarea duplicatelor',
+            'ALTER TABLE poze ADD COLUMN amprenta_fisier VARCHAR(64) DEFAULT NULL;'],
+        ['coloana', 'urari', 'jeton',           'cine a scris urarea',
+            'ALTER TABLE urari ADD COLUMN jeton VARCHAR(64) DEFAULT NULL;'],
+
+        ['index', 'poze',      'idx_galerie',   'galeria, sortare după dată',
+            'CREATE INDEX idx_galerie ON poze (aprobat, data_incarcare, id);'],
+        ['index', 'poze',      'idx_apreciate', 'galeria, cele mai apreciate',
+            'CREATE INDEX idx_apreciate ON poze (aprobat, aprecieri, data_incarcare);'],
+        ['index', 'poze',      'idx_jeton',     'căutarea fișierelor proprii',
+            'CREATE INDEX idx_jeton ON poze (jeton);'],
+        ['index', 'poze',      'idx_amprenta',  'căutarea duplicatelor',
+            'CREATE INDEX idx_amprenta ON poze (amprenta_fisier);'],
+        ['index', 'urari',     'idx_aprobat',   'lista de urări',
+            'CREATE INDEX idx_aprobat ON urari (aprobat, data_creare);'],
+        ['index', 'urari',     'idx_jeton',     'urările proprii',
+            'CREATE INDEX idx_jeton ON urari (jeton);'],
+        ['index', 'aprecieri', 'idx_poza',      'numărarea aprecierilor',
+            'CREATE INDEX idx_poza ON aprecieri (poza_id);'],
+    ];
+
+    $lipsesc = 0;
+    foreach ($asteptat as [$fel, $tabela, $nume, $rol, $sqlFix]) {
+        if ($fel === 'tabela')      { $n = $areTabela($tabela);        $et = 'Tabela ' . $tabela; }
+        elseif ($fel === 'coloana') { $n = $areColoana($tabela, $nume); $et = $tabela . '.' . $nume; }
+        else                        { $n = $areIndex($tabela, $nume);   $et = 'Index ' . $nume . ' (' . $tabela . ')'; }
+
+        if ($n === null) {
+            rand_raport('Structura bazei de date', $et, 'nu s-a putut verifica', 'atentie', $rol);
+            continue;
+        }
+        if ($n > 0) {
+            rand_raport('Structura bazei de date', $et, 'există', 'ok', $rol);
+            continue;
+        }
+        /* Un index lipsă încetinește; o tabelă sau o coloană lipsă strică funcții. */
+        $grav = $fel === 'index' ? 'atentie' : 'rau';
+        rand_raport('Structura bazei de date', $et, 'LIPSEȘTE', $grav, $rol);
+        $lipsesc++;
+        if ($sqlFix) $sqlDeRulat[] = $sqlFix;
+    }
+
+    $ver = (int)setare('schema_v', '0');
+    rand_raport('Structura bazei de date', 'Versiunea schemei', (string)$ver,
+        $ver >= 6 ? 'ok' : 'atentie',
+        'Doar informativ: migrarea înghite erorile, deci numărul poate fi corect chiar dacă ceva lipsește. Contează rândurile de mai sus.');
+
+    if ($lipsesc > 0) {
+        problema($lipsesc . ' element(e) lipsesc din baza de date. Rulează în phpMyAdmin comenzile SQL afișate mai jos — cel mai probabil utilizatorul bazei de date nu are drept de ALTER.');
+    }
+} else {
+    rand_raport('Structura bazei de date', 'Verificare', 'imposibilă', 'rau', 'Nu există conexiune la baza de date.');
+}
+
+/* ============================================================
    5. SPAȚIU PE DISC
    ============================================================ */
 $liber = @disk_free_space(__DIR__);
@@ -366,6 +469,11 @@ if ($liber !== false && $total !== false) {
     $rezumat .= "Disc: liber " . om((int)$liber) . " din " . om((int)$total) . " · uploads/ = " . om($dimUploads) . " ($nrFisiere fisiere)\n";
 }
 $rezumat .= "CPU: " . ($nuclee ?: '?') . " nuclee\n";
+/* Fără conexiune nu s-a verificat nimic — a spune „completă" ar fi o
+   liniștire falsă, exact ce reproșăm numărului de versiune. */
+$rezumat .= "Structura BD: " . (!isset($pdo)
+    ? "NEVERIFICATA (fara conexiune la baza de date)"
+    : (empty($sqlDeRulat) ? "completa" : count($sqlDeRulat) . " elemente lipsa (vezi SQL de reparatie)")) . "\n";
 $rezumat .= "Probleme gasite: " . count($probleme) . "\n";
 foreach ($probleme as $i => $p) $rezumat .= ($i + 1) . ". $p\n";
 
@@ -376,6 +484,9 @@ $simbol = ['ok' => '✓', 'atentie' => '!', 'rau' => '✕', 'info' => '·'];
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <title>Diagnostic server · <?= h(NUME_MIRE) ?> &amp; <?= h(NUME_MIREASA) ?></title>
 <style>
   *{box-sizing:border-box}
@@ -453,6 +564,23 @@ $simbol = ['ok' => '✓', 'atentie' => '!', 'rau' => '✕', 'info' => '·'];
       </table>
     </div>
   <?php endforeach; ?>
+
+  <?php if (!empty($sqlDeRulat)): ?>
+    <div class="card">
+      <h2>SQL de reparație</h2>
+      <table><tr><td colspan="4">
+        <p style="margin-top:0">
+          Lipsesc structuri din baza de date. Deschide <strong>cPanel → phpMyAdmin</strong>,
+          alege baza <code><?= h(DB_NAME) ?></code>, intră pe fila <strong>SQL</strong>
+          și rulează:
+        </p>
+        <pre><?= h(implode("\n", $sqlDeRulat)) ?></pre>
+        <p class="mic">
+          După ce le rulezi, reîncarcă această pagină: rândurile de mai sus trebuie să devină toate verzi.
+        </p>
+      </td></tr></table>
+    </div>
+  <?php endif; ?>
 
   <div class="card">
     <h2>Valori recomandate</h2>

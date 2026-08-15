@@ -9,6 +9,13 @@ function cap_pagina(string $titlu, string $paginaActiva = ''): void {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#FBF7EF">
+<?php /* Album privat de familie: nu-l vrem în rezultatele căutărilor.
+         Previzualizarea de pe WhatsApp/Facebook funcționează în continuare,
+         pentru că nu trece prin indexarea motoarelor de căutare. */ ?>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <title><?= h($titlu) ?> · <?= $mire ?> &amp; <?= $mireasa ?></title>
 <meta name="description" content="Albumul foto al nunții <?= $mire ?> &amp; <?= $mireasa ?> — <?= h(DATA_NUNTII) ?>. Încarcă-ți pozele și retrăiește momentele.">
 <meta property="og:type" content="website">
@@ -22,9 +29,7 @@ function cap_pagina(string $titlu, string $paginaActiva = ''): void {
 <?php else: ?>
 <meta name="twitter:card" content="summary">
 <?php endif; ?>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/fonturi.css?v=<?= @filemtime(__DIR__ . '/assets/fonturi.css') ?>">
 <link rel="stylesheet" href="assets/style.css?v=<?= @filemtime(__DIR__ . '/assets/style.css') ?>">
 </head>
 <body>

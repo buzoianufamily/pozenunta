@@ -17,6 +17,7 @@
    ============================================================ */
 require_once __DIR__ . '/functions.php';
 header('Content-Type: application/json; charset=utf-8');
+inchide_sesiune();   // bucățile nu ating sesiunea; fără blocaj, urcă în paralel
 
 /* Atenție: NU atingem baza de date la „stare" și „bucata". Un film de
    1 GB înseamnă ~250 de bucăți; dacă fiecare ar deschide o conexiune,
@@ -201,6 +202,14 @@ if ($actiune === 'finalizeaza') {
 
     $tip = in_array($ext, extensii_video(), true) ? 'video' : 'imagine';
 
+    /* Există deja exact acest fișier? Aruncăm bucata adunată și
+       răspundem împăciuitor: pentru invitat, treaba e făcută. */
+    $amprentaFis = amprenta_fisier($cale);
+    if (duplicat_existent($amprentaFis) !== null) {
+        @unlink($cale);
+        raspunde(['ok' => true, 'reusite' => 0, 'duplicat' => true, 'moderare' => moderare_activa()]);
+    }
+
     try {
         $numeFisier = date('Ymd') . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
     } catch (Throwable $e) {
@@ -225,8 +234,8 @@ if ($actiune === 'finalizeaza') {
     try {
         asigura_schema();
         $stmt = db()->prepare(
-            'INSERT INTO poze (nume_fisier, nume_original, nume_invitat, mesaj, tip, marime, aprobat, ip)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO poze (nume_fisier, nume_original, nume_invitat, mesaj, tip, marime, aprobat, ip, jeton, amprenta_fisier)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
             $numeFisier,
@@ -237,6 +246,8 @@ if ($actiune === 'finalizeaza') {
             $dim,
             moderare_activa() ? 0 : 1,
             $_SERVER['REMOTE_ADDR'] ?? null,
+            amprenta_jeton(jeton_invitat(true)),
+            $amprentaFis,
         ]);
     } catch (Throwable $e) {
         @unlink($destinatie);

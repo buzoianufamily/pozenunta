@@ -24,9 +24,24 @@
   function likeSet() { try { return new Set(JSON.parse(localStorage.getItem(CHEIE_LIKE) || '[]')); } catch (e) { return new Set(); } }
   function salveazaLike(set) { try { localStorage.setItem(CHEIE_LIKE, JSON.stringify(Array.prototype.slice.call(set))); } catch (e) {} }
   function esteApreciat(id) { return likeSet().has(id); }
+
+  /* Serverul e sursa de adevăr: ține aprecierile pe invitat, nu pe
+     telefon. Sincronizăm memoria locală cu ce spune el, ca inimile să
+     arate corect și de pe alt dispozitiv. */
+  function sincronizeazaLike(poze) {
+    var set = likeSet(), schimbat = false;
+    poze.forEach(function (p) {
+      if (typeof p.apreciat !== 'boolean') return;
+      if (p.apreciat && !set.has(p.id)) { set.add(p.id); schimbat = true; }
+      else if (!p.apreciat && set.has(p.id)) { set.delete(p.id); schimbat = true; }
+    });
+    if (schimbat) salveazaLike(set);
+  }
+
   function trimiteLike(id, val) {
     var fd = new FormData(); fd.append('id', id); fd.append('val', val);
-    return fetch('like.php', { method: 'POST', body: fd }).then(function (r) { return r.json(); }).catch(function () { return { ok: false }; });
+    return fetch('like.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+      .then(function (r) { return r.json(); }).catch(function () { return { ok: false }; });
   }
 
   /* ============================================================
@@ -53,7 +68,9 @@
   var MAX_DIM = 2560, CALITATE = 0.85, heicProm = null;
   function incarcaHeic() {
     if (heicProm) return heicProm;
-    heicProm = new Promise(function (res, rej) { var s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js'; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+    /* Găzduit local: la nuntă, WiFi-ul sălii poate fi lent sau filtrat,
+       iar fără această bibliotecă pozele de pe iPhone nu s-ar încărca. */
+    heicProm = new Promise(function (res, rej) { var s = document.createElement('script'); s.src = 'assets/vendor/heic2any.min.js'; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
     return heicProm;
   }
   function proceseazaImagine(file) {
@@ -152,14 +169,30 @@
     ['dragleave', 'drop'].forEach(function (ev) { dropzone.addEventListener(ev, function (e) { e.preventDefault(); dropzone.classList.remove('peste'); }); });
     dropzone.addEventListener('drop', function (e) { if (e.dataTransfer && e.dataTransfer.files) adauga(e.dataTransfer.files); });
 
+    /* Aceeași poză aleasă de două ori în aceeași listă. O prindem aici,
+       ca să nu urcăm degeaba; serverul verifică oricum și conținutul. */
+    function dejaInLista(f) {
+      for (var i = 0; i < coada.length; i++) {
+        var it = coada[i];
+        if (it.file && it.file.name === f.name && it.file.size === f.size
+            && it.file.lastModified === f.lastModified) return true;
+      }
+      return false;
+    }
+
     function adauga(fileList) {
+      var sarite = 0;
       Array.prototype.forEach.call(fileList, function (f) {
         if (!esteImagine(f) && !esteVideo(f)) return;
+        if (dejaInLista(f)) { sarite++; return; }
         var item = { id: uid(), sid: sidNou(), file: f, blob: null, name: f.name, nume: '', mesaj: '', isVideo: esteVideo(f), status: 'queued', processed: false, persisted: false, ultimaEroare: null };
         item.row = rowFor(item, f);
         lista.appendChild(item.row);
         coada.push(item);
       });
+      if (sarite > 0) {
+        toast(sarite === 1 ? 'O fotografie era deja în listă.' : 'Am sărit ' + sarite + ' fișiere care erau deja în listă.');
+      }
       actualizeazaButon();
     }
 
@@ -176,7 +209,9 @@
       }
       rand.innerHTML = miniHtml +
         '<div class="meta"><div class="nume">' + esc(item.name) + '</div>' +
-        '<div class="stare">În așteptare</div><div class="bara"><i></i></div></div>';
+        '<div class="stare" role="status">În așteptare</div>' +
+        '<div class="bara" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"' +
+        ' aria-label="Progres încărcare ' + esc(item.name) + '"><i></i></div></div>';
       item.row = rand;
       return rand;
     }
@@ -185,7 +220,12 @@
       if (!item.row) return;
       var s = item.row.querySelector('.stare'); var b = item.row.querySelector('.bara > i');
       if (s) s.textContent = text;
-      if (b && progres != null) b.style.width = Math.round(progres * 100) + '%';
+      if (b && progres != null) {
+        var proc = Math.round(progres * 100);
+        b.style.width = proc + '%';
+        var bara = item.row.querySelector('.bara');
+        if (bara) bara.setAttribute('aria-valuenow', String(proc));
+      }
     }
 
     function actualizeazaButon() {
@@ -279,7 +319,7 @@
         var campuri = { actiune: 'finalizeaza', id: item.sid, name: item.name, nume: item.nume, mesaj: item.mesaj };
         var fis = item.poster ? [{ camp: 'poster', blob: item.poster, nume: 'poster.jpg' }] : null;
         var fin = await cerereBucati(campuri, fis, null);
-        if (fin && fin.ok) return true;
+        if (fin && fin.ok) { item.duplicat = !!fin.duplicat; return true; }
         item.ultimaEroare = (fin && fin.eroare) ? fin.eroare : null;
         return false;
       })();
@@ -297,7 +337,7 @@
             if (ok) return true;
           } else {
             var rez = await urca(item, function (p) { setStare(item, 'Se încarcă… ' + Math.round(p * 100) + '%', p); });
-            if (rez && rez.ok) return true;
+            if (rez && rez.ok) { item.duplicat = !!rez.duplicat; return true; }
             item.ultimaEroare = (rez && rez.erori && rez.erori[0]) ? rez.erori[0] : null;
           }
           if (t < MAX_TRIES - 1) {
@@ -331,7 +371,11 @@
             await proceseazaItem(item);
             try { await idbPut({ id: item.id, sid: item.sid, blob: item.blob, poster: item.poster || null, name: item.name, nume: item.nume, mesaj: item.mesaj, isVideo: item.isVideo }); item.persisted = true; } catch (e) { item.persisted = false; }
             var ok = await urcaCuReincercare(item);
-            if (ok) { item.status = 'done'; item.row.classList.add('gata'); setStare(item, 'Încărcat ✓', 1); try { await idbDel(item.id); } catch (e) {} }
+            if (ok) {
+              item.status = 'done'; item.row.classList.add('gata');
+              setStare(item, item.duplicat ? 'Era deja în album ✓' : 'Încărcat ✓', 1);
+              try { await idbDel(item.id); } catch (e) {}
+            }
             else { item.status = 'error'; item.row.classList.add('eroare'); setStare(item, item.ultimaEroare || 'Nu s-a putut încărca — reia când revii', 0); }
           } catch (e) { item.status = 'error'; item.row.classList.add('eroare'); setStare(item, 'Eroare', 0); }
         }
@@ -346,10 +390,20 @@
     }
 
     function finalizeaza() {
-      var done = coada.filter(function (it) { return it.status === 'done'; }).length;
+      var gata  = coada.filter(function (it) { return it.status === 'done'; });
+      var done  = gata.length;
+      var dubl  = gata.filter(function (it) { return it.duplicat; }).length;
+      var noi   = done - dubl;
       var erori = coada.filter(function (it) { return it.status === 'error'; }).length;
       if (done > 0 && erori === 0) {
-        succesTxt.textContent = done === 1 ? 'Fotografia ta a fost adăugată în album.' : 'Cele ' + done + ' fișiere au fost adăugate în album.';
+        if (noi === 0) {
+          succesTxt.textContent = dubl === 1
+            ? 'Această fotografie era deja în album.'
+            : 'Toate cele ' + dubl + ' fișiere erau deja în album.';
+        } else {
+          succesTxt.textContent = (noi === 1 ? 'Fotografia ta a fost adăugată în album.' : 'Cele ' + noi + ' fișiere au fost adăugate în album.')
+            + (dubl > 0 ? (dubl === 1 ? ' Unul era deja acolo.' : ' ' + dubl + ' erau deja acolo.') : '');
+        }
         zona.style.display = 'none'; succes.style.display = 'block';
         succes.scrollIntoView({ behavior: 'smooth', block: 'center' });
       } else if (done > 0 && erori > 0) {
@@ -369,9 +423,26 @@
       btn.parentNode.appendChild(b);
     }
 
+    /* ---------- ține minte numele invitatului ----------
+       Cine urcă poze de mai multe ori în seară nu trebuie să-și scrie
+       numele de fiecare dată. Mesajul NU se reține: e legat de poza
+       de atunci, nu de persoană. */
+    var CHEIE_NUME = 'nunta_nume_invitat';
+    var campNume = document.getElementById('nume');
+    if (campNume) {
+      try {
+        var salvat = localStorage.getItem(CHEIE_NUME);
+        if (salvat && !campNume.value) campNume.value = salvat;
+      } catch (e) {}
+    }
+
     btn.addEventListener('click', function () {
-      var nume = (document.getElementById('nume').value || '').trim();
+      var nume = (campNume ? campNume.value : '').trim();
       var mesaj = (document.getElementById('mesaj').value || '').trim();
+      try {
+        if (nume) localStorage.setItem(CHEIE_NUME, nume);
+        else localStorage.removeItem(CHEIE_NUME);
+      } catch (e) {}
       coada.forEach(function (it) { if (it.status === 'queued') { it.nume = nume; it.mesaj = mesaj; } });
       pornestePool();
     });
@@ -460,7 +531,7 @@
       seIncarca = true; miniLoader.style.display = 'block';
       return fetch('api.php?actiune=lista&sortare=' + sortare + '&pagina=' + (pagina + 1))
         .then(function (r) { return r.json(); })
-        .then(function (d) { if (d && d.ok) { pagina = d.pagina; if (d.poze.length) { niciUna = false; adaugaPoze(d.poze); } maiSunt = d.maiSunt; } else { maiSunt = false; } })
+        .then(function (d) { if (d && d.ok) { pagina = d.pagina; if (d.poze.length) { niciUna = false; sincronizeazaLike(d.poze); adaugaPoze(d.poze); } maiSunt = d.maiSunt; } else { maiSunt = false; } })
         .catch(function () { maiSunt = false; })
         .finally(function () { seIncarca = false; miniLoader.style.display = 'none'; if (niciUna) golEl.style.display = 'block'; if (maiSunt && document.body.scrollHeight <= window.innerHeight + 200) incarcaPagina(); });
     }
@@ -475,7 +546,17 @@
     /* ---- lightbox ---- */
     var lb = document.getElementById('lightbox'), lbCont = document.getElementById('lb-continut'), lbCap = document.getElementById('lb-caption'), lbDl = document.getElementById('lb-download');
     var lbLike = document.getElementById('lb-like'), lbLikeN = document.getElementById('lb-like-n');
+    var lbSterge = document.getElementById('lb-sterge');
     var idxCurent = 0, lbIdActual = null;
+
+    /* Numele cu care se salvează fișierul pe telefonul invitatului.
+       Pe server are un nume aleatoriu; aici îi punem unul cu sens. */
+    function numeDescarcare(p) {
+      var ext = (p.original.split('.').pop() || 'jpg').split(/[?#]/)[0];
+      var baza = (document.title.split('·').pop() || 'nunta').trim()
+                  .replace(/\s+/g, '-').replace(/[^\w\-]/g, '').toLowerCase();
+      return (baza || 'nunta') + '-' + p.id + '.' + ext;
+    }
 
     function randeaza(i) {
       var p = toate[i]; if (!p) return; idxCurent = i; lbIdActual = p.id;
@@ -486,11 +567,64 @@
       if (p.nume) cap += '<div class="nume">' + esc(p.nume) + '</div>';
       if (p.mesaj) cap += '<div class="mesaj">' + esc(p.mesaj) + '</div>';
       cap += '<div class="data">' + esc(p.data) + '</div>';
-      lbCap.innerHTML = cap; lbDl.href = p.original;
+      lbCap.innerHTML = cap;
+      lbDl.href = p.original;
+      lbDl.setAttribute('download', numeDescarcare(p));
       lbLikeN.textContent = p.aprecieri; lbLike.classList.toggle('activ', esteApreciat(p.id));
+      if (lbSterge) lbSterge.hidden = !p.alMeu;
     }
-    function deschideLightbox(i) { randeaza(i); lb.classList.add('deschis'); lb.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden'; }
-    function inchide() { lb.classList.remove('deschis'); lb.setAttribute('aria-hidden', 'true'); lbCont.innerHTML = ''; lbIdActual = null; document.body.style.overflow = ''; }
+
+    /* Ștergerea propriului fișier. Serverul verifică din nou dreptul —
+       aici doar nu arătăm butonul unde nu are ce căuta. */
+    function stergeAlMeu(id) {
+      var p = null, idx = -1;
+      for (var i = 0; i < toate.length; i++) { if (toate[i].id === id) { p = toate[i]; idx = i; break; } }
+      if (!p || !p.alMeu) return;
+      var ce = p.tip === 'video' ? 'filmul' : 'fotografia';
+      var confirmat = p.tip === 'video'
+        ? 'Filmul a fost șters din album.'
+        : 'Fotografia a fost ștearsă din album.';
+      if (!window.confirm('Ștergi ' + ce + ' din album? Această acțiune nu poate fi anulată.')) return;
+
+      var fd = new FormData(); fd.append('id', String(id));
+      fetch('sterge-poza.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d || !d.ok) { toast((d && d.eroare) || 'Nu s-a putut șterge.'); return; }
+          toate.splice(idx, 1);
+          var el = galerieEl.querySelector('.poza[data-id="' + id + '"]');
+          if (el) el.remove();
+          /* indicii din DOM se schimbă după ștergere — le refacem */
+          Array.prototype.forEach.call(galerieEl.querySelectorAll('.poza'), function (n, k) {
+            n.setAttribute('data-idx', k);
+          });
+          inchide();
+          toast(confirmat);
+        })
+        .catch(function () { toast('Conexiune întreruptă. Încearcă din nou.'); });
+    }
+    /* Focalizarea rămâne în lightbox cât e deschis: altfel tastatura
+       „iese" pe legăturile din spatele lui, care nu se văd. */
+    var focalizatInainte = null;
+    function focalizabile() {
+      return Array.prototype.filter.call(
+        lb.querySelectorAll('button, a[href], video, [tabindex]:not([tabindex="-1"])'),
+        function (el) { return !el.hasAttribute('hidden') && el.offsetParent !== null; }
+      );
+    }
+    function deschideLightbox(i) {
+      focalizatInainte = document.activeElement;
+      randeaza(i);
+      lb.classList.add('deschis'); lb.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      var f = focalizabile(); if (f.length) f[0].focus();
+    }
+    function inchide() {
+      lb.classList.remove('deschis'); lb.setAttribute('aria-hidden', 'true');
+      lbCont.innerHTML = ''; lbIdActual = null; document.body.style.overflow = '';
+      if (focalizatInainte && focalizatInainte.focus) focalizatInainte.focus();
+      focalizatInainte = null;
+    }
     function navig(dir) {
       var nou = idxCurent + dir;
       if (nou < 0) nou = toate.length - 1;
@@ -501,8 +635,23 @@
     document.getElementById('lb-prev').addEventListener('click', function (e) { e.stopPropagation(); navig(-1); });
     document.getElementById('lb-next').addEventListener('click', function (e) { e.stopPropagation(); navig(1); });
     lbLike.addEventListener('click', function (e) { e.stopPropagation(); if (lbIdActual != null) comutaLike(lbIdActual); });
+    if (lbSterge) lbSterge.addEventListener('click', function (e) { e.stopPropagation(); if (lbIdActual != null) stergeAlMeu(lbIdActual); });
     lb.addEventListener('click', function (e) { if (e.target === lb || e.target === lbCont) inchide(); });
-    document.addEventListener('keydown', function (e) { if (!lb.classList.contains('deschis')) return; if (e.key === 'Escape') inchide(); else if (e.key === 'ArrowLeft') navig(-1); else if (e.key === 'ArrowRight') navig(1); });
+    document.addEventListener('keydown', function (e) {
+      if (!lb.classList.contains('deschis')) return;
+      if (e.key === 'Escape') { inchide(); return; }
+      if (e.key === 'ArrowLeft')  { navig(-1); return; }
+      if (e.key === 'ArrowRight') { navig(1);  return; }
+      if (e.key !== 'Tab') return;
+
+      /* Tab circulă doar printre elementele din lightbox. */
+      var f = focalizabile();
+      if (!f.length) { e.preventDefault(); return; }
+      var primul = f[0], ultimul = f[f.length - 1];
+      if (!lb.contains(document.activeElement)) { e.preventDefault(); primul.focus(); return; }
+      if (e.shiftKey && document.activeElement === primul) { e.preventDefault(); ultimul.focus(); }
+      else if (!e.shiftKey && document.activeElement === ultimul) { e.preventDefault(); primul.focus(); }
+    });
   }
 
   /* ============================================================

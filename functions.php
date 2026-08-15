@@ -60,10 +60,56 @@ function mesaj_bun_venit(): string {
 }
 
 /* ============================================================
+   JETONUL INVITATULUI (ca să-și poată șterge propriile fișiere)
+   ------------------------------------------------------------
+   Invitatul nu are cont. La prima încărcare îi punem în telefon un
+   cookie cu un cod secret. În baza de date salvăm DOAR amprenta
+   codului (sha256), niciodată codul în sine — dacă cineva ar citi
+   baza de date, tot nu ar putea șterge pozele nimănui.
+
+   Cookie-ul e httpOnly: JavaScript nu îl poate citi, deci nu poate
+   fi furat printr-un script străin strecurat în pagină.
+   ============================================================ */
+define('COOKIE_INVITAT', 'invitat');
+define('COOKIE_INVITAT_ZILE', 400);
+
+function jeton_invitat(bool $creeazaDacaLipsete = false): string {
+    $j = (string)($_COOKIE[COOKIE_INVITAT] ?? '');
+    if (preg_match('/^[a-f0-9]{32,64}$/', $j)) return $j;
+    if (!$creeazaDacaLipsete) return '';
+
+    try {
+        $j = bin2hex(random_bytes(24));
+    } catch (Throwable $e) {
+        $j = hash('sha256', uniqid('', true) . mt_rand());
+    }
+    if (!headers_sent()) {
+        setcookie(COOKIE_INVITAT, $j, [
+            'expires'  => time() + COOKIE_INVITAT_ZILE * 86400,
+            'path'     => '/',
+            'httponly' => true,
+            'samesite' => 'Lax',
+            'secure'   => !empty($_SERVER['HTTPS']),
+        ]);
+    }
+    $_COOKIE[COOKIE_INVITAT] = $j;
+    return $j;
+}
+
+/* Ce se salvează efectiv în baza de date. */
+function amprenta_jeton(string $jeton): ?string {
+    return $jeton === '' ? null : hash('sha256', $jeton);
+}
+
+/* ============================================================
    AUTENTIFICARE ADMIN
    ============================================================ */
+/* Fără sesiune pornită nu există autentificare.
+   Verificăm $_SESSION, nu session_status(): după inchide_sesiune() starea
+   devine „inactiv", dar datele citite rămân disponibile — iar adminul
+   trebuie să rămână admin până la finalul cererii. */
 function este_admin(): bool {
-    return !empty($_SESSION['admin']);
+    return isset($_SESSION) && !empty($_SESSION['admin']);
 }
 
 function cere_admin(): void {
@@ -75,13 +121,15 @@ function cere_admin(): void {
 
 /* Token CSRF simplu pentru formularele din admin */
 function csrf_token(): string {
+    porneste_sesiune(true);   // aici chiar avem nevoie de sesiune
     if (empty($_SESSION['csrf'])) {
         $_SESSION['csrf'] = bin2hex(random_bytes(32));
     }
     return $_SESSION['csrf'];
 }
 function csrf_valid(?string $token): bool {
-    return !empty($token) && !empty($_SESSION['csrf']) && hash_equals($_SESSION['csrf'], $token);
+    return isset($_SESSION) && !empty($token) && !empty($_SESSION['csrf'])
+        && hash_equals($_SESSION['csrf'], $token);
 }
 
 /* ============================================================
@@ -150,8 +198,18 @@ function url_original(array $poza): string {
     return UPLOAD_URL . rawurlencode($poza['nume_fisier']);
 }
 
-/* Construiește un array „curat" pentru JSON */
+/* Construiește un array „curat" pentru JSON.
+   Amprenta invitatului NU pleacă niciodată către pagină — trimitem doar
+   „alMeu", ca telefonul lui să știe unde să arate butonul de ștergere. */
 function poza_pentru_json(array $p): array {
+    static $amprentaMea = false;
+    if ($amprentaMea === false) {
+        $amprentaMea = amprenta_jeton(jeton_invitat(false));
+    }
+    $alMeu = $amprentaMea !== null
+             && !empty($p['jeton'])
+             && hash_equals((string)$p['jeton'], $amprentaMea);
+
     return [
         'id'        => (int)$p['id'],
         'tip'       => $p['tip'],
@@ -161,6 +219,7 @@ function poza_pentru_json(array $p): array {
         'mesaj'     => $p['mesaj'] ?: '',
         'aprecieri' => (int)($p['aprecieri'] ?? 0),
         'data'      => date('d.m.Y H:i', strtotime($p['data_incarcare'])),
+        'alMeu'     => $alMeu,
     ];
 }
 
@@ -170,22 +229,130 @@ function poza_pentru_json(array $p): array {
    „ADD COLUMN IF NOT EXISTS", iar versiunea o ținem în setări
    ca să nu verificăm la fiecare cerere.
    ============================================================ */
+/* Verificări portabile: „ADD COLUMN IF NOT EXISTS" merge pe MariaDB,
+   dar nu pe MySQL. Întrebăm catalogul, ca să meargă pe amândouă. */
+function coloana_exista(string $tabela, string $coloana): bool {
+    try {
+        $st = db()->prepare(
+            'SELECT COUNT(*) FROM information_schema.columns
+             WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?'
+        );
+        $st->execute([$tabela, $coloana]);
+        return (int)$st->fetchColumn() > 0;
+    } catch (Throwable $e) { return true; }   // la dubiu, nu modificăm nimic
+}
+
+function index_exista(string $tabela, string $index): bool {
+    try {
+        $st = db()->prepare(
+            'SELECT COUNT(*) FROM information_schema.statistics
+             WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?'
+        );
+        $st->execute([$tabela, $index]);
+        return (int)$st->fetchColumn() > 0;
+    } catch (Throwable $e) { return true; }
+}
+
+function adauga_index(string $tabela, string $nume, string $coloane): void {
+    if (index_exista($tabela, $nume)) return;
+    try { db()->exec("CREATE INDEX `$nume` ON `$tabela` ($coloane)"); }
+    catch (Throwable $e) { /* index deja existent sub alt nume */ }
+}
+
 function asigura_schema(): void {
     try {
-        if ((int)setare('schema_v', '0') < 3) {
-            db()->exec("ALTER TABLE poze ADD COLUMN IF NOT EXISTS aprecieri INT UNSIGNED NOT NULL DEFAULT 0");
-            db()->exec("CREATE TABLE IF NOT EXISTS urari (
-                id           INT AUTO_INCREMENT PRIMARY KEY,
-                nume         VARCHAR(120) NOT NULL,
-                mesaj        TEXT NOT NULL,
-                aprobat      TINYINT(1) NOT NULL DEFAULT 1,
-                ip           VARCHAR(45) DEFAULT NULL,
-                data_creare  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                INDEX idx_data (data_creare)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-            salveaza_setare('schema_v', '3');
+        if ((int)setare('schema_v', '0') >= 6) return;
+
+        if (!coloana_exista('poze', 'aprecieri')) {
+            db()->exec('ALTER TABLE poze ADD COLUMN aprecieri INT UNSIGNED NOT NULL DEFAULT 0');
         }
+        /* Amprenta invitatului care a încărcat fișierul. */
+        if (!coloana_exista('poze', 'jeton')) {
+            db()->exec('ALTER TABLE poze ADD COLUMN jeton VARCHAR(64) DEFAULT NULL');
+        }
+        /* Amprenta conținutului, pentru a nu primi aceeași poză de două ori. */
+        if (!coloana_exista('poze', 'amprenta_fisier')) {
+            db()->exec('ALTER TABLE poze ADD COLUMN amprenta_fisier VARCHAR(64) DEFAULT NULL');
+        }
+
+        db()->exec("CREATE TABLE IF NOT EXISTS urari (
+            id           INT AUTO_INCREMENT PRIMARY KEY,
+            nume         VARCHAR(120) NOT NULL,
+            mesaj        TEXT NOT NULL,
+            aprobat      TINYINT(1) NOT NULL DEFAULT 1,
+            ip           VARCHAR(45) DEFAULT NULL,
+            data_creare  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_data (data_creare)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        /* Indexuri pentru galerie: fără ele, fiecare derulare sortează
+           toată tabela. Se simte când sute de oameni se uită deodată. */
+        adauga_index('poze',  'idx_galerie',   'aprobat, data_incarcare, id');
+        adauga_index('poze',  'idx_apreciate', 'aprobat, aprecieri, data_incarcare');
+        /* Proprietarul urării, ca invitatul să și-o poată șterge. */
+        if (!coloana_exista('urari', 'jeton')) {
+            db()->exec('ALTER TABLE urari ADD COLUMN jeton VARCHAR(64) DEFAULT NULL');
+        }
+
+        /* Aprecierile se numără pe server, câte una per invitat și poză.
+           Cheia primară dublă face imposibilă aprecierea de două ori. */
+        db()->exec("CREATE TABLE IF NOT EXISTS aprecieri (
+            poza_id     INT NOT NULL,
+            jeton       VARCHAR(64) NOT NULL,
+            data_creare TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (poza_id, jeton),
+            INDEX idx_poza (poza_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        adauga_index('poze',  'idx_jeton',     'jeton');
+        adauga_index('poze',  'idx_amprenta',  'amprenta_fisier');
+        adauga_index('urari', 'idx_aprobat',   'aprobat, data_creare');
+        adauga_index('urari', 'idx_jeton',     'jeton');
+
+        salveaza_setare('schema_v', '6');
     } catch (Throwable $e) { /* tabela poate lipsi înainte de setup */ }
+}
+
+/* Ce a apreciat deja invitatul, dintr-o listă de poze. O singură
+   interogare pentru toată pagina, nu una per poză. */
+function aprecieri_mele(array $ids): array {
+    $amprenta = amprenta_jeton(jeton_invitat(false));
+    if ($amprenta === null || empty($ids)) return [];
+    $ids = array_values(array_unique(array_map('intval', $ids)));
+    $sem = implode(',', array_fill(0, count($ids), '?'));
+    try {
+        $st = db()->prepare("SELECT poza_id FROM aprecieri WHERE jeton = ? AND poza_id IN ($sem)");
+        $st->execute(array_merge([$amprenta], $ids));
+        return array_flip(array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN)));
+    } catch (Throwable $e) { return []; }
+}
+
+/* ============================================================
+   FIȘIERE DUPLICATE
+   ------------------------------------------------------------
+   Amprenta se calculează din conținutul fișierului, nu din nume:
+   aceeași poză trimisă sub alt nume tot duplicat este.
+
+   Atenție la ce NU prinde: pozele sunt micșorate în telefon înainte
+   de trimitere, iar două telefoane diferite produc fișiere ușor
+   diferite din același original. Deci se prind sigur retrimiterile
+   de pe același telefon — cazul obișnuit, când cineva selectează din
+   greșeală aceleași poze a doua oară.
+   ============================================================ */
+function amprenta_fisier(string $cale): ?string {
+    $h = @hash_file('sha256', $cale);
+    return $h === false ? null : $h;
+}
+
+/* Întoarce id-ul fișierului identic deja existent, dacă există. */
+function duplicat_existent(?string $amprenta): ?int {
+    if ($amprenta === null || $amprenta === '') return null;
+    try {
+        $st = db()->prepare('SELECT id FROM poze WHERE amprenta_fisier = ? LIMIT 1');
+        $st->execute([$amprenta]);
+        $id = $st->fetchColumn();
+        return $id === false ? null : (int)$id;
+    } catch (Throwable $e) { return null; }
 }
 
 /* ============================================================

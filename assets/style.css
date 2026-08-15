@@ -183,10 +183,12 @@ img{max-width:100%;display:block}
 @media(max-width:1000px){.galerie{column-count:3}}
 @media(max-width:680px){.galerie{column-count:2;column-gap:10px}}
 .poza{
+  display:block;                 /* și când e legătură <a>, nu doar <div> */
   break-inside:avoid;margin-bottom:14px;border-radius:var(--radius-sm);overflow:hidden;position:relative;
   background:var(--card);box-shadow:var(--shadow-sm);cursor:pointer;
   opacity:0;transform:translateY(12px);transition:opacity .5s ease,transform .5s ease;
 }
+a.poza:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .poza.vizibil{opacity:1;transform:none}
 .poza img{width:100%;height:auto;display:block;transition:transform .5s ease}
 .poza:hover img{transform:scale(1.04)}
@@ -216,8 +218,24 @@ img{max-width:100%;display:block}
 .lb-inchide{position:absolute;top:18px;right:22px;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.12);color:#fff;border:0;cursor:pointer;font-size:1.4rem;line-height:1;display:flex;align-items:center;justify-content:center}
 .lb-inchide:hover{background:rgba(255,255,255,.24)}
 .lb-actiune{position:absolute;top:18px;left:22px;display:flex;gap:10px}
-.lb-actiune a{background:rgba(255,255,255,.12);color:#fff;border-radius:999px;padding:9px 16px;font-size:.76rem;letter-spacing:.1em;text-transform:uppercase}
-.lb-actiune a:hover{background:rgba(255,255,255,.24)}
+.lb-actiune a,.lb-actiune .lb-link{background:rgba(255,255,255,.12);color:#fff;border:0;cursor:pointer;
+  border-radius:999px;padding:9px 16px;font-size:.76rem;letter-spacing:.1em;text-transform:uppercase;
+  font-family:inherit;line-height:1.2}
+.lb-actiune a:hover,.lb-actiune .lb-link:hover{background:rgba(255,255,255,.24)}
+/* ștergerea propriului fișier — vizibil diferit, ca să nu se apese din greșeală */
+.lb-actiune .lb-sterge{background:rgba(210,70,60,.22);color:#ffd9d5}
+.lb-actiune .lb-sterge:hover{background:rgba(210,70,60,.42);color:#fff}
+.lb-actiune .lb-sterge[hidden]{display:none}
+
+/* ștergerea propriei urări — discretă, ca să nu strice pagina */
+.urare-sterge{margin-top:10px}
+.urare-sterge button{background:none;border:0;padding:0;cursor:pointer;font:inherit;
+  font-size:.76rem;letter-spacing:.06em;color:#a99c84;text-decoration:underline;text-underline-offset:3px}
+.urare-sterge button:hover{color:#B3261E}
+
+/* paginare urări */
+.paginare{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:28px;flex-wrap:wrap}
+.paginare-info{font-size:.8rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 
 /* sentinela scroll infinit */
 .sentinela{height:40px}
@@ -273,6 +291,23 @@ img{max-width:100%;display:block}
 .panou{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow-sm);margin-bottom:24px}
 .panou h2{font-family:var(--serif);font-weight:500;font-size:1.5rem;margin:0 0 4px;color:var(--green)}
 .panou .ajutor{color:var(--muted);font-size:.88rem;margin-bottom:16px}
+
+/* carte de urări, în panoul de administrare */
+.urari-admin{display:flex;flex-direction:column;gap:12px}
+.urare-rand{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;
+  padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.urare-rand.neaprobata{border-color:#E7C9A0;background:#FFFBF4}
+.urare-rand .ur-continut{min-width:0;flex:1}
+.urare-rand .ur-cap{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+.urare-rand .ur-data{font-size:.76rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.urare-rand .ur-eticheta{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;
+  background:#F0D9B5;color:#7A5A21;padding:2px 8px;border-radius:999px}
+.urare-rand .ur-mesaj{font-size:.94rem;line-height:1.5;overflow-wrap:anywhere}
+.urare-rand .ur-actiuni{display:flex;gap:8px;flex-shrink:0}
+@media (max-width:640px){
+  .urare-rand{flex-direction:column}
+  .urare-rand .ur-actiuni{width:100%}
+}
 .rand-form{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 .switch{display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-size:.92rem}
 .switch input{display:none}

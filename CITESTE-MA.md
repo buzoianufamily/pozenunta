@@ -30,7 +30,7 @@ Domeniu: **nunta.razvanbuzoianu.ro** · Bază de date: **r140100buzo_pozenunta**
    - `ADMIN_USER` și **`ADMIN_PASS`** — utilizatorul și parola cu care intri în panou (acum se setează aici!).
 
    Atenție: dacă păstrezi vechiul `config.php`, autentificarea NU va merge, pentru că s-a redenumit `ADMIN_PASS_INITIALA` -> `ADMIN_PASS`. Cel mai sigur: folosește noul `config.php` și completează cele 5 valori.
-3. **Nu trebuie să rulezi nimic în baza de date.** La prima accesare, aplicația adaugă singură coloana de aprecieri (migrare automată). Nu rula din nou `setup.php`.
+3. **De obicei nu trebuie să rulezi nimic în baza de date** — la prima accesare aplicația își adaugă singură ce îi lipsește. Dacă totuși ceva nu merge, deschide `instalare.php` (cere autentificare) și îți spune exact ce lipsește și creează la apăsarea unui buton. Nu șterge niciodată date, deci poate fi rulat oricând.
 4. **Reîmprospătează cu Ctrl+F5** (sau golește cache-ul) ca să se încarce noul design și noul cod.
 5. Intră în panou (`login.php`), mergi la **Setări -> Fotografia de cuplu** și încarcă poza voastră de copertă (când o ai).
 
@@ -40,8 +40,8 @@ Domeniu: **nunta.razvanbuzoianu.ro** · Bază de date: **r140100buzo_pozenunta**
 
 1. Urcă toate fișierele în `public_html`.
 2. Editează `config.php`: datele bazei de date, `SITE_URL`, `ADMIN_USER`, `ADMIN_PASS`.
-3. Deschide în browser **o singură dată** `https://nunta.razvanbuzoianu.ro/setup.php` (creează tabelele).
-4. **Șterge `setup.php`** după ce a mers.
+3. Intră pe `https://nunta.razvanbuzoianu.ro/login.php`, apoi deschide `instalare.php` și apasă butonul (creează tabelele).
+4. Dacă mai ai pe server un `setup.php` din instalarea veche, **șterge-l** — nu cerea autentificare, deci îl putea deschide oricine. `instalare.php` îl înlocuiește și e protejat prin login.
 5. Gata — pagina de start e `index.php`.
 
 ---

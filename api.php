@@ -3,6 +3,10 @@ require_once __DIR__ . '/functions.php';
 header('Content-Type: application/json; charset=utf-8');
 asigura_schema();
 
+/* Nu mai scriem nimic în sesiune de aici încolo: eliberăm blocajul, ca
+   celelalte cereri ale aceluiași vizitator să nu aștepte după noi. */
+inchide_sesiune();
+
 $actiune = $_GET['actiune'] ?? 'lista';
 
 if ($actiune === 'lista') {
@@ -28,6 +32,11 @@ if ($actiune === 'lista') {
     if ($maiSunt) array_pop($randuri);
 
     $poze = array_map('poza_pentru_json', $randuri);
+
+    /* Inimile deja apăsate de acest invitat — sursa de adevăr e serverul,
+       nu memoria telefonului, deci se văd corect și de pe alt dispozitiv. */
+    $mele = aprecieri_mele(array_column($randuri, 'id'));
+    foreach ($poze as $i => $p) { $poze[$i]['apreciat'] = isset($mele[$p['id']]); }
 
     echo json_encode([
         'ok'      => true,
