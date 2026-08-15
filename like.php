@@ -58,5 +58,16 @@ try {
 
     echo json_encode(['ok' => true, 'aprecieri' => $nou, 'apreciat' => $val === 1]);
 } catch (Throwable $e) {
-    echo json_encode(['ok' => false]);
+    /* Un „ok:false" mut lăsa pagina să arate inima apăsată deși pe server
+       nu se salvase nimic. Spunem ce s-a stricat, ca să se vadă. */
+    $lipsaTabela = stripos($e->getMessage(), 'aprecieri') !== false
+                   && (stripos($e->getMessage(), "doesn't exist") !== false
+                       || stripos($e->getMessage(), 'not exist') !== false);
+    http_response_code(500);
+    echo json_encode([
+        'ok'     => false,
+        'eroare' => $lipsaTabela
+            ? 'Tabela aprecierilor lipsește din baza de date. Deschide instalare.php.'
+            : 'Aprecierea nu s-a putut salva. Încearcă din nou.',
+    ], JSON_UNESCAPED_UNICODE);
 }

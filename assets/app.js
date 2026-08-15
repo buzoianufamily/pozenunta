@@ -514,10 +514,30 @@
 
     function comutaLike(id) {
       var set = likeSet(); var nowLiked = !set.has(id); var val = nowLiked ? 1 : -1;
-      if (nowLiked) set.add(id); else set.delete(id); salveazaLike(set);
-      var p = toate.find(function (x) { return x.id === id; }); if (p) p.aprecieri = Math.max(0, p.aprecieri + val);
+      var p = toate.find(function (x) { return x.id === id; });
+      var vechiNumar = p ? p.aprecieri : 0;
+
+      /* Arătăm imediat rezultatul, ca apăsarea să pară instantanee… */
+      if (nowLiked) set.add(id); else set.delete(id);
+      salveazaLike(set);
+      if (p) p.aprecieri = Math.max(0, p.aprecieri + val);
       actualizeazaInimi(id);
-      trimiteLike(id, val).then(function (r) { if (r && r.ok) { if (p) p.aprecieri = r.aprecieri; actualizeazaInimi(id); } });
+
+      trimiteLike(id, val).then(function (r) {
+        if (r && r.ok) {
+          if (p) p.aprecieri = r.aprecieri;
+          actualizeazaInimi(id);
+          return;
+        }
+        /* …dar dacă serverul n-a reușit, dăm înapoi. Altfel inima rămânea
+           apăsată degeaba, iar la reîncărcarea paginii sărea la loc. */
+        var s = likeSet();
+        if (nowLiked) s.delete(id); else s.add(id);
+        salveazaLike(s);
+        if (p) p.aprecieri = vechiNumar;
+        actualizeazaInimi(id);
+        toast((r && r.eroare) ? r.eroare : 'Aprecierea nu s-a putut salva.');
+      });
     }
 
     function actualizeazaInimi(id) {
@@ -639,9 +659,18 @@
     lb.addEventListener('click', function (e) { if (e.target === lb || e.target === lbCont) inchide(); });
     document.addEventListener('keydown', function (e) {
       if (!lb.classList.contains('deschis')) return;
+
+      /* Cât filmul e pe tot ecranul, tastele sunt ale lui: săgețile
+         derulează, Escape iese din ecran complet. Fără asta, săgeata
+         sărea la fișierul anterior chiar în timpul vizionării. */
+      if (document.fullscreenElement || document.webkitFullscreenElement) return;
+
+      /* La fel când filmul e selectat: derulează, nu schimbă fișierul. */
+      var peFilm = e.target && e.target.tagName === 'VIDEO';
+
       if (e.key === 'Escape') { inchide(); return; }
-      if (e.key === 'ArrowLeft')  { navig(-1); return; }
-      if (e.key === 'ArrowRight') { navig(1);  return; }
+      if (e.key === 'ArrowLeft')  { if (!peFilm) navig(-1); return; }
+      if (e.key === 'ArrowRight') { if (!peFilm) navig(1);  return; }
       if (e.key !== 'Tab') return;
 
       /* Tab circulă doar printre elementele din lightbox. */
