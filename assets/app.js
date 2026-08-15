@@ -126,7 +126,24 @@
     var poolRuleaza = false;
     var CONC = 3, MAX_TRIES = 4, BACKOFF = [800, 2000, 4000];
 
+    /* Fișierele mai mari de atât se trimit pe bucăți, ca să poată fi
+       reluate din punctul rămas. Pozele (micșorate pe telefon, ~1-2 MB)
+       merg dintr-o bucată — e mai rapid și e drumul deja verificat. */
+    var PRAG_BUCATI = 8 * 1024 * 1024;
+    var BUCATA      = 4 * 1024 * 1024;
+    var BUCATA_TRIES = 3, BUCATA_BACKOFF = [1000, 3000, 6000];
+
     function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+    /* Identificator hexazecimal pentru server (îl cere strict hex).
+       Se salvează lângă fișier, ca reluarea de mâine să nimerească
+       aceeași bucată de pe server. */
+    function sidNou() {
+      var b = new Uint8Array(16);
+      if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(b);
+      else for (var i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256);
+      return Array.prototype.map.call(b, function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+    }
 
     dropzone.addEventListener('click', function () { input.click(); });
     dropzone.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
@@ -138,7 +155,7 @@
     function adauga(fileList) {
       Array.prototype.forEach.call(fileList, function (f) {
         if (!esteImagine(f) && !esteVideo(f)) return;
-        var item = { id: uid(), file: f, blob: null, name: f.name, nume: '', mesaj: '', isVideo: esteVideo(f), status: 'queued', processed: false, persisted: false, ultimaEroare: null };
+        var item = { id: uid(), sid: sidNou(), file: f, blob: null, name: f.name, nume: '', mesaj: '', isVideo: esteVideo(f), status: 'queued', processed: false, persisted: false, ultimaEroare: null };
         item.row = rowFor(item, f);
         lista.appendChild(item.row);
         coada.push(item);
@@ -193,13 +210,100 @@
       });
     }
 
+    /* ---------- încărcare pe bucăți (fișiere mari) ---------- */
+
+    /* O singură cerere către upload-bucati.php */
+    function cerereBucati(campuri, fisiere, onProgress) {
+      return new Promise(function (resolve) {
+        var fd = new FormData();
+        Object.keys(campuri).forEach(function (k) { fd.append(k, campuri[k]); });
+        (fisiere || []).forEach(function (f) { fd.append(f.camp, f.blob, f.nume); });
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', 'upload-bucati.php');
+        if (onProgress && xhr.upload) {
+          xhr.upload.onprogress = function (e) { if (e.lengthComputable) onProgress(e.loaded); };
+        }
+        xhr.onload  = function () { try { resolve(JSON.parse(xhr.responseText)); } catch (_) { resolve(null); } };
+        xhr.onerror = function () { resolve(null); };
+        xhr.ontimeout = function () { resolve(null); };
+        xhr.send(fd);
+      });
+    }
+
+    /* Întreabă serverul de unde reluăm. null = nu s-a putut afla. */
+    function stareServer(sid) {
+      return cerereBucati({ actiune: 'stare', id: sid }, null, null)
+        .then(function (r) { return (r && r.ok) ? r.primit : null; });
+    }
+
+    /* Trimite fișierul felie cu felie, continuând de unde a rămas. */
+    function urcaPeBucati(item, onProgress) {
+      return (async function () {
+        var total = item.blob.size;
+
+        var primit = await stareServer(item.sid);
+        if (primit === null) return false;                 // serverul nu răspunde
+        if (primit > total) primit = 0;                    // nepotrivire → o luăm de la capăt
+
+        while (primit < total) {
+          var pana   = Math.min(primit + BUCATA, total);
+          var felie  = item.blob.slice(primit, pana);
+          var bazaPr = primit;
+          var rez = null;
+
+          /* fiecare bucată are reîncercările ei; dacă pică, nu pierdem
+             decât bucata curentă, nu tot fișierul */
+          for (var t = 0; t < BUCATA_TRIES; t++) {
+            rez = await cerereBucati(
+              { actiune: 'bucata', id: item.sid, offset: bazaPr },
+              [{ camp: 'bucata', blob: felie, nume: 'b' }],
+              function (incarcat) { onProgress(Math.min(1, (bazaPr + incarcat) / total)); }
+            );
+            if (rez) break;
+            if (t < BUCATA_TRIES - 1) {
+              setStare(item, 'Conexiune slabă — reiau de unde am rămas…', bazaPr / total);
+              await pauza(BUCATA_BACKOFF[Math.min(t, BUCATA_BACKOFF.length - 1)]);
+            }
+          }
+
+          if (!rez) return false;                          // rețeaua a căzut de tot
+          if (rez.desincronizat) { primit = rez.primit; continue; }  // ne resincronizăm
+          if (!rez.ok) { item.ultimaEroare = rez.eroare || null; return false; }
+
+          primit = rez.primit;
+          onProgress(Math.min(1, primit / total));
+        }
+
+        /* Gata bucățile — cerem lipirea în album. */
+        setStare(item, 'Se finalizează…', 1);
+        var campuri = { actiune: 'finalizeaza', id: item.sid, name: item.name, nume: item.nume, mesaj: item.mesaj };
+        var fis = item.poster ? [{ camp: 'poster', blob: item.poster, nume: 'poster.jpg' }] : null;
+        var fin = await cerereBucati(campuri, fis, null);
+        if (fin && fin.ok) return true;
+        item.ultimaEroare = (fin && fin.eroare) ? fin.eroare : null;
+        return false;
+      })();
+    }
+
     function urcaCuReincercare(item) {
       return (async function () {
+        var peBucati = item.blob && item.blob.size > PRAG_BUCATI;
         for (var t = 0; t < MAX_TRIES; t++) {
-          var rez = await urca(item, function (p) { setStare(item, 'Se încarcă… ' + Math.round(p * 100) + '%', p); });
-          if (rez && rez.ok) return true;
-          item.ultimaEroare = (rez && rez.erori && rez.erori[0]) ? rez.erori[0] : null;
-          if (t < MAX_TRIES - 1) { setStare(item, 'Conexiune slabă — reîncerc…', 0); await pauza(BACKOFF[Math.min(t, BACKOFF.length - 1)]); }
+          var ok;
+          if (peBucati) {
+            ok = await urcaPeBucati(item, function (p) {
+              setStare(item, 'Se încarcă… ' + Math.round(p * 100) + '%', p);
+            });
+            if (ok) return true;
+          } else {
+            var rez = await urca(item, function (p) { setStare(item, 'Se încarcă… ' + Math.round(p * 100) + '%', p); });
+            if (rez && rez.ok) return true;
+            item.ultimaEroare = (rez && rez.erori && rez.erori[0]) ? rez.erori[0] : null;
+          }
+          if (t < MAX_TRIES - 1) {
+            setStare(item, 'Conexiune slabă — reîncerc…', 0);
+            await pauza(BACKOFF[Math.min(t, BACKOFF.length - 1)]);
+          }
         }
         return false;
       })();
@@ -225,7 +329,7 @@
           try {
             setStare(item, 'Se pregătește…', 0);
             await proceseazaItem(item);
-            try { await idbPut({ id: item.id, blob: item.blob, poster: item.poster || null, name: item.name, nume: item.nume, mesaj: item.mesaj, isVideo: item.isVideo }); item.persisted = true; } catch (e) { item.persisted = false; }
+            try { await idbPut({ id: item.id, sid: item.sid, blob: item.blob, poster: item.poster || null, name: item.name, nume: item.nume, mesaj: item.mesaj, isVideo: item.isVideo }); item.persisted = true; } catch (e) { item.persisted = false; }
             var ok = await urcaCuReincercare(item);
             if (ok) { item.status = 'done'; item.row.classList.add('gata'); setStare(item, 'Încărcat ✓', 1); try { await idbDel(item.id); } catch (e) {} }
             else { item.status = 'error'; item.row.classList.add('eroare'); setStare(item, item.ultimaEroare || 'Nu s-a putut încărca — reia când revii', 0); }
@@ -288,13 +392,13 @@
       idbAll().then(function (rest) {
         if (!rest || !rest.length) return;
         var banner = document.createElement('div'); banner.className = 'banner-reluare';
-        banner.innerHTML = '<span>Avem ' + rest.length + ' fișier(e) neîncărcat(e) de data trecută. Le reluăm automat…</span>';
+        banner.innerHTML = '<span>Avem ' + rest.length + ' fișier(e) neterminat(e). Continuăm automat de unde am rămas…</span>';
         var ren = document.createElement('button'); ren.className = 'btn btn-ghost btn-mic'; ren.textContent = 'Renunță';
         ren.addEventListener('click', function () { idbClear().then(function () { coada = coada.filter(function (it) { return it.status !== 'pending'; }); lista.innerHTML = ''; banner.remove(); actualizeazaButon(); }); });
         banner.appendChild(ren);
         zona.insertBefore(banner, zona.firstChild);
         rest.forEach(function (r) {
-          var item = { id: r.id, file: null, blob: r.blob, poster: r.poster || null, name: r.name, nume: r.nume || '', mesaj: r.mesaj || '', isVideo: !!r.isVideo, status: 'pending', processed: true, persisted: true, ultimaEroare: null };
+          var item = { id: r.id, sid: r.sid || sidNou(), file: null, blob: r.blob, poster: r.poster || null, name: r.name, nume: r.nume || '', mesaj: r.mesaj || '', isVideo: !!r.isVideo, status: 'pending', processed: true, persisted: true, ultimaEroare: null };
           item.row = rowFor(item, (r.isVideo && r.poster) ? r.poster : r.blob); lista.appendChild(item.row); coada.push(item);
         });
         actualizeazaButon(); pornestePool();
