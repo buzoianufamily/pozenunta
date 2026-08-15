@@ -51,14 +51,15 @@ $aprobat     = moderare_activa() ? 0 : 1;
 /* Codul secret al invitatului, ca să-și poată șterge singur fișierele. */
 $amprenta    = amprenta_jeton(jeton_invitat(true));
 $reusite     = 0;
+$duplicate   = 0;
 $erori       = [];
 $ext_imagini = extensii_imagini();
 $ext_video   = extensii_video();
 $ext_permise = extensii_permise();
 
 $stmt = db()->prepare(
-    'INSERT INTO poze (nume_fisier, nume_original, nume_invitat, mesaj, tip, marime, aprobat, ip, jeton)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO poze (nume_fisier, nume_original, nume_invitat, mesaj, tip, marime, aprobat, ip, jeton, amprenta_fisier)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
 );
 
 foreach ($fisiere as $f) {
@@ -82,6 +83,14 @@ foreach ($fisiere as $f) {
         continue;
     }
     $tip = in_array($ext, $ext_video, true) ? 'video' : 'imagine';
+
+    /* Același fișier există deja? Îl considerăm rezolvat, nu eroare:
+       invitatul nu a greșit cu nimic, poza lui e deja în album. */
+    $amprentaFis = amprenta_fisier($f['tmp_name']);
+    if (duplicat_existent($amprentaFis) !== null) {
+        $duplicate++;
+        continue;
+    }
 
     // nume unic, imposibil de ghicit
     try {
@@ -115,6 +124,7 @@ foreach ($fisiere as $f) {
             $aprobat,
             $ip,
             $amprenta,
+            $amprentaFis,
         ]);
         $reusite++;
     } catch (Throwable $e) {
@@ -125,8 +135,10 @@ foreach ($fisiere as $f) {
 }
 
 echo json_encode([
-    'ok'       => $reusite > 0,
-    'reusite'  => $reusite,
-    'erori'    => $erori,
-    'moderare' => $aprobat === 0,
+    'ok'        => $reusite > 0 || $duplicate > 0,
+    'reusite'   => $reusite,
+    'duplicate' => $duplicate,
+    'duplicat'  => $reusite === 0 && $duplicate > 0,
+    'erori'     => $erori,
+    'moderare'  => $aprobat === 0,
 ], JSON_UNESCAPED_UNICODE);

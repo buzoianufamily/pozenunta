@@ -255,7 +255,7 @@ function adauga_index(string $tabela, string $nume, string $coloane): void {
 
 function asigura_schema(): void {
     try {
-        if ((int)setare('schema_v', '0') >= 4) return;
+        if ((int)setare('schema_v', '0') >= 5) return;
 
         if (!coloana_exista('poze', 'aprecieri')) {
             db()->exec('ALTER TABLE poze ADD COLUMN aprecieri INT UNSIGNED NOT NULL DEFAULT 0');
@@ -263,6 +263,10 @@ function asigura_schema(): void {
         /* Amprenta invitatului care a încărcat fișierul. */
         if (!coloana_exista('poze', 'jeton')) {
             db()->exec('ALTER TABLE poze ADD COLUMN jeton VARCHAR(64) DEFAULT NULL');
+        }
+        /* Amprenta conținutului, pentru a nu primi aceeași poză de două ori. */
+        if (!coloana_exista('poze', 'amprenta_fisier')) {
+            db()->exec('ALTER TABLE poze ADD COLUMN amprenta_fisier VARCHAR(64) DEFAULT NULL');
         }
 
         db()->exec("CREATE TABLE IF NOT EXISTS urari (
@@ -280,10 +284,39 @@ function asigura_schema(): void {
         adauga_index('poze',  'idx_galerie',   'aprobat, data_incarcare, id');
         adauga_index('poze',  'idx_apreciate', 'aprobat, aprecieri, data_incarcare');
         adauga_index('poze',  'idx_jeton',     'jeton');
+        adauga_index('poze',  'idx_amprenta',  'amprenta_fisier');
         adauga_index('urari', 'idx_aprobat',   'aprobat, data_creare');
 
-        salveaza_setare('schema_v', '4');
+        salveaza_setare('schema_v', '5');
     } catch (Throwable $e) { /* tabela poate lipsi înainte de setup */ }
+}
+
+/* ============================================================
+   FIȘIERE DUPLICATE
+   ------------------------------------------------------------
+   Amprenta se calculează din conținutul fișierului, nu din nume:
+   aceeași poză trimisă sub alt nume tot duplicat este.
+
+   Atenție la ce NU prinde: pozele sunt micșorate în telefon înainte
+   de trimitere, iar două telefoane diferite produc fișiere ușor
+   diferite din același original. Deci se prind sigur retrimiterile
+   de pe același telefon — cazul obișnuit, când cineva selectează din
+   greșeală aceleași poze a doua oară.
+   ============================================================ */
+function amprenta_fisier(string $cale): ?string {
+    $h = @hash_file('sha256', $cale);
+    return $h === false ? null : $h;
+}
+
+/* Întoarce id-ul fișierului identic deja existent, dacă există. */
+function duplicat_existent(?string $amprenta): ?int {
+    if ($amprenta === null || $amprenta === '') return null;
+    try {
+        $st = db()->prepare('SELECT id FROM poze WHERE amprenta_fisier = ? LIMIT 1');
+        $st->execute([$amprenta]);
+        $id = $st->fetchColumn();
+        return $id === false ? null : (int)$id;
+    } catch (Throwable $e) { return null; }
 }
 
 /* ============================================================

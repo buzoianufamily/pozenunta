@@ -154,14 +154,30 @@
     ['dragleave', 'drop'].forEach(function (ev) { dropzone.addEventListener(ev, function (e) { e.preventDefault(); dropzone.classList.remove('peste'); }); });
     dropzone.addEventListener('drop', function (e) { if (e.dataTransfer && e.dataTransfer.files) adauga(e.dataTransfer.files); });
 
+    /* Aceeași poză aleasă de două ori în aceeași listă. O prindem aici,
+       ca să nu urcăm degeaba; serverul verifică oricum și conținutul. */
+    function dejaInLista(f) {
+      for (var i = 0; i < coada.length; i++) {
+        var it = coada[i];
+        if (it.file && it.file.name === f.name && it.file.size === f.size
+            && it.file.lastModified === f.lastModified) return true;
+      }
+      return false;
+    }
+
     function adauga(fileList) {
+      var sarite = 0;
       Array.prototype.forEach.call(fileList, function (f) {
         if (!esteImagine(f) && !esteVideo(f)) return;
+        if (dejaInLista(f)) { sarite++; return; }
         var item = { id: uid(), sid: sidNou(), file: f, blob: null, name: f.name, nume: '', mesaj: '', isVideo: esteVideo(f), status: 'queued', processed: false, persisted: false, ultimaEroare: null };
         item.row = rowFor(item, f);
         lista.appendChild(item.row);
         coada.push(item);
       });
+      if (sarite > 0) {
+        toast(sarite === 1 ? 'O fotografie era deja în listă.' : 'Am sărit ' + sarite + ' fișiere care erau deja în listă.');
+      }
       actualizeazaButon();
     }
 
@@ -281,7 +297,7 @@
         var campuri = { actiune: 'finalizeaza', id: item.sid, name: item.name, nume: item.nume, mesaj: item.mesaj };
         var fis = item.poster ? [{ camp: 'poster', blob: item.poster, nume: 'poster.jpg' }] : null;
         var fin = await cerereBucati(campuri, fis, null);
-        if (fin && fin.ok) return true;
+        if (fin && fin.ok) { item.duplicat = !!fin.duplicat; return true; }
         item.ultimaEroare = (fin && fin.eroare) ? fin.eroare : null;
         return false;
       })();
@@ -299,7 +315,7 @@
             if (ok) return true;
           } else {
             var rez = await urca(item, function (p) { setStare(item, 'Se încarcă… ' + Math.round(p * 100) + '%', p); });
-            if (rez && rez.ok) return true;
+            if (rez && rez.ok) { item.duplicat = !!rez.duplicat; return true; }
             item.ultimaEroare = (rez && rez.erori && rez.erori[0]) ? rez.erori[0] : null;
           }
           if (t < MAX_TRIES - 1) {
@@ -333,7 +349,11 @@
             await proceseazaItem(item);
             try { await idbPut({ id: item.id, sid: item.sid, blob: item.blob, poster: item.poster || null, name: item.name, nume: item.nume, mesaj: item.mesaj, isVideo: item.isVideo }); item.persisted = true; } catch (e) { item.persisted = false; }
             var ok = await urcaCuReincercare(item);
-            if (ok) { item.status = 'done'; item.row.classList.add('gata'); setStare(item, 'Încărcat ✓', 1); try { await idbDel(item.id); } catch (e) {} }
+            if (ok) {
+              item.status = 'done'; item.row.classList.add('gata');
+              setStare(item, item.duplicat ? 'Era deja în album ✓' : 'Încărcat ✓', 1);
+              try { await idbDel(item.id); } catch (e) {}
+            }
             else { item.status = 'error'; item.row.classList.add('eroare'); setStare(item, item.ultimaEroare || 'Nu s-a putut încărca — reia când revii', 0); }
           } catch (e) { item.status = 'error'; item.row.classList.add('eroare'); setStare(item, 'Eroare', 0); }
         }
@@ -348,10 +368,20 @@
     }
 
     function finalizeaza() {
-      var done = coada.filter(function (it) { return it.status === 'done'; }).length;
+      var gata  = coada.filter(function (it) { return it.status === 'done'; });
+      var done  = gata.length;
+      var dubl  = gata.filter(function (it) { return it.duplicat; }).length;
+      var noi   = done - dubl;
       var erori = coada.filter(function (it) { return it.status === 'error'; }).length;
       if (done > 0 && erori === 0) {
-        succesTxt.textContent = done === 1 ? 'Fotografia ta a fost adăugată în album.' : 'Cele ' + done + ' fișiere au fost adăugate în album.';
+        if (noi === 0) {
+          succesTxt.textContent = dubl === 1
+            ? 'Această fotografie era deja în album.'
+            : 'Toate cele ' + dubl + ' fișiere erau deja în album.';
+        } else {
+          succesTxt.textContent = (noi === 1 ? 'Fotografia ta a fost adăugată în album.' : 'Cele ' + noi + ' fișiere au fost adăugate în album.')
+            + (dubl > 0 ? (dubl === 1 ? ' Unul era deja acolo.' : ' ' + dubl + ' erau deja acolo.') : '');
+        }
         zona.style.display = 'none'; succes.style.display = 'block';
         succes.scrollIntoView({ behavior: 'smooth', block: 'center' });
       } else if (done > 0 && erori > 0) {
