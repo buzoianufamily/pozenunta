@@ -129,16 +129,26 @@ $pasi[] = ['index', 'urari', 'idx_aprobat', 'Lista de urări',
 $pasi[] = ['index', 'urari', 'idx_jeton', 'Urările proprii',
     'CREATE INDEX idx_jeton ON urari (jeton)'];
 
-/* Starea curentă a fiecărui pas: 1 există, 0 lipsește, null necunoscut. */
+/* Starea curentă a fiecărui pas: 1 există, 0 lipsește, null necunoscut.
+
+   Atenție la numărătoare: în catalog, un index pe mai multe coloane apare
+   cu câte un rând pentru fiecare coloană. Un index pe trei coloane dă
+   „3", nu „1" — iar dacă am compara cu 1, l-am crede lipsă și am încerca
+   să-l creăm peste el. De aceea aducem totul la 0 sau 1. */
 function starea_pasului(?PDO $pdo, array $pas): ?int {
     [$fel, $tabela, $nume] = $pas;
-    if ($fel === 'tabela')  return are_tabela($pdo, $tabela);
-    if ($fel === 'coloana') {
+
+    if ($fel === 'tabela') {
+        $n = are_tabela($pdo, $tabela);
+    } elseif ($fel === 'coloana') {
         if (!are_tabela($pdo, $tabela)) return 0;   // fără tabelă, nici coloana
-        return are_coloana($pdo, $tabela, $nume);
+        $n = are_coloana($pdo, $tabela, $nume);
+    } else {
+        if (!are_tabela($pdo, $tabela)) return 0;
+        $n = are_index($pdo, $tabela, $nume);
     }
-    if (!are_tabela($pdo, $tabela)) return 0;
-    return are_index($pdo, $tabela, $nume);
+
+    return $n === null ? null : ($n > 0 ? 1 : 0);
 }
 
 /* ============================================================
@@ -165,7 +175,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $pdo) {
                 $pdo->exec($sql);
                 $rezultate[] = ['ok', "$eticheta — creat"];
             } catch (Throwable $e) {
-                $rezultate[] = ['rau', "$eticheta — NU s-a putut crea: " . $e->getMessage()];
+                /* „Există deja" nu e o defecțiune: 1050 tabelă, 1060 coloană,
+                   1061 index. Se poate întâmpla dacă verificarea din catalog
+                   n-a văzut ceva ce serverul are. */
+                $cod = ($e instanceof PDOException && isset($e->errorInfo[1])) ? (int)$e->errorInfo[1] : 0;
+                if (in_array($cod, [1050, 1060, 1061], true)) {
+                    $rezultate[] = ['sarit', "$eticheta — există deja"];
+                } else {
+                    $rezultate[] = ['rau', "$eticheta — NU s-a putut crea: " . $e->getMessage()];
+                }
             }
         }
 
