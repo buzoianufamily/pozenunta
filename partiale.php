@@ -9,6 +9,9 @@ function cap_pagina(string $titlu, string $paginaActiva = ''): void {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#FBF7EF">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <title><?= h($titlu) ?> · <?= $mire ?> &amp; <?= $mireasa ?></title>
 <meta name="description" content="Albumul foto al nunții <?= $mire ?> &amp; <?= $mireasa ?> — <?= h(DATA_NUNTII) ?>. Încarcă-ți pozele și retrăiește momentele.">
 <meta property="og:type" content="website">

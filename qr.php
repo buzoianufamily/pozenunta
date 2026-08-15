@@ -7,6 +7,9 @@ $url = SITE_URL ?: ((($_SERVER['HTTPS'] ?? '') ? 'https' : 'http') . '://' . ($_
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <title>Cod QR · <?= h(NUME_MIRE) ?> &amp; <?= h(NUME_MIREASA) ?></title>
 <link rel="stylesheet" href="assets/fonturi.css">
 <link rel="stylesheet" href="assets/style.css">
