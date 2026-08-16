@@ -308,7 +308,17 @@
         if (onProgress && xhr.upload) {
           xhr.upload.onprogress = function (e) { if (e.lengthComputable) onProgress(e.loaded); };
         }
-        xhr.onload  = function () { try { resolve(JSON.parse(xhr.responseText)); } catch (_) { resolve(null); } };
+        xhr.onload  = function () {
+          /* Găzduirea permite un număr limitat de procese deodată. Când e
+             plin, răspunde 508 sau 503 — nu e o defecțiune, e „revino
+             imediat". Îl deosebim, ca să așteptăm mai mult înainte de a
+             reîncerca, în loc să împingem și mai tare într-un server plin. */
+          if (xhr.status === 508 || xhr.status === 503 || xhr.status === 429) {
+            resolve({ ok: false, ocupat: true });
+            return;
+          }
+          try { resolve(JSON.parse(xhr.responseText)); } catch (_) { resolve(null); }
+        };
         xhr.onerror = function () { resolve(null); };
         xhr.ontimeout = function () { resolve(null); };
         xhr.send(fd);
@@ -336,14 +346,31 @@
           var bazaPr = primit;
           var rez = null;
 
-          /* fiecare bucată are reîncercările ei; dacă pică, nu pierdem
-             decât bucata curentă, nu tot fișierul */
-          for (var t = 0; t < BUCATA_TRIES; t++) {
-            rez = await cerereBucati(
+          function trimiteFelia() {
+            return cerereBucati(
               { actiune: 'bucata', id: item.sid, offset: bazaPr, total: total },
               [{ camp: 'bucata', blob: felie, nume: 'b' }],
               function (incarcat) { onProgress(Math.min(1, (bazaPr + incarcat) / total)); }
             );
+          }
+
+          /* fiecare bucată are reîncercările ei; dacă pică, nu pierdem
+             decât bucata curentă, nu tot fișierul */
+          for (var t = 0; t < BUCATA_TRIES; t++) {
+            rez = await trimiteFelia();
+
+            /* Serverul plin nu e o defecțiune, ci „revino imediat". Îl
+               așteptăm separat, fără să consumăm încercările pentru
+               probleme de rețea — dar nu la nesfârșit. */
+            var ocupatDe = 0;
+            while (rez && rez.ocupat && ocupatDe < 6) {
+              ocupatDe++;
+              setStare(item, 'Serverul e aglomerat — aștept puțin…', bazaPr / total);
+              await pauza(8000 + Math.random() * 7000);   // împrăștiem revenirile
+              rez = await trimiteFelia();
+            }
+            if (rez && rez.ocupat) rez = null;            // tot plin: tratăm ca eșec
+
             if (rez) break;
             if (t < BUCATA_TRIES - 1) {
               setStare(item, 'Conexiune slabă — reiau de unde am rămas…', bazaPr / total);
@@ -483,7 +510,10 @@
 
     btn.addEventListener('click', function () {
       var nume = (campNume ? campNume.value : '').trim();
-      var mesaj = (document.getElementById('mesaj').value || '').trim();
+      /* Câmpul de mesaj nu mai există în formular (gândurile se scriu în
+         Cartea de urări), dar codul merge și dacă e pus la loc. */
+      var campMesaj = document.getElementById('mesaj');
+      var mesaj = campMesaj ? (campMesaj.value || '').trim() : '';
       try {
         if (nume) localStorage.setItem(CHEIE_NUME, nume);
         else localStorage.removeItem(CHEIE_NUME);
@@ -494,7 +524,7 @@
 
     if (btnDinNou) btnDinNou.addEventListener('click', function () {
       coada = []; lista.innerHTML = '';
-      document.getElementById('mesaj').value = '';
+      var cm = document.getElementById('mesaj'); if (cm) cm.value = '';
       var br = document.getElementById('btn-reincearca'); if (br) br.remove();
       succes.style.display = 'none'; zona.style.display = 'block';
       actualizeazaButon(); window.scrollTo({ top: 0, behavior: 'smooth' });

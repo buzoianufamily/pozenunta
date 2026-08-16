@@ -23,6 +23,64 @@ cap_pagina('Acasă', 'acasa');
   </div>
 </section>
 
+<section class="sectiune">
+  <div class="container">
+    <div class="sectiune-titlu fade-up">
+      <div class="ornament"><span class="ln"></span><span class="dot"></span><span class="ln r"></span></div>
+      <h2>Împărtășește momentele</h2>
+      <p>Ai surprins un moment frumos? Încarcă-l aici — pozele și filmele tale ajung direct în albumul nostru. Nu e nevoie de cont.</p>
+    </div>
+
+    <div class="upload-wrap fade-up">
+      <div id="zona-upload">
+        <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Alege poze sau filme">
+          <div class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" width="56" height="56">
+              <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5"/>
+              <path d="M4 14v3.5A2.5 2.5 0 0 0 6.5 20h11a2.5 2.5 0 0 0 2.5-2.5V14"/>
+            </svg>
+          </div>
+          <div class="titlu">Încarcă pozele și videoclipurile aici</div>
+          <div class="desc">Poți selecta oricâte deodată, direct de pe telefon</div>
+          <div class="formate">JPG · PNG · HEIC · GIF · MP4 · MOV</div>
+        </div>
+        <input type="file" id="input-fisiere" accept="image/*,video/*" multiple hidden>
+
+        <div class="campuri">
+          <div class="camp">
+            <label for="nume">Numele tău</label>
+            <input type="text" id="nume" maxlength="120" placeholder="ex: Familia Popescu">
+            <div class="ajutor-camp">Scrie-ți numele ca să știm ale cui sunt pozele — opțional, dar ne-ar bucura mult 🤍</div>
+          </div>
+        </div>
+        <?php /* Câmpul de mesaj a fost scos anume: există Cartea de urări,
+                 iar două locuri unde scrii un gând îl fac pe invitat să se
+                 întrebe care e diferența. Rămâne: alege fișiere, scrie-ți
+                 numele, apasă. */ ?>
+
+        <div class="lista-fisiere" id="lista-fisiere"></div>
+
+        <div style="margin-top:18px;text-align:center">
+          <button class="btn btn-primar btn-full" id="btn-incarca" disabled>Încarcă în album</button>
+        </div>
+      </div>
+
+      <div class="card succes-box" id="zona-succes" style="display:none">
+        <div class="check" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="34" height="34"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+        <h3>Mulțumim din suflet!</h3>
+        <p id="succes-text">Pozele tale au fost adăugate în album.</p>
+        <div style="margin-top:18px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+          <a class="btn btn-primar" href="galerie.php">Vezi galeria</a>
+          <button class="btn btn-ghost" id="btn-din-nou">Mai încarcă</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
 <div class="container narrow">
   <div class="card mesaj-miri fade-up d3">
     <div class="text"><?= h(mesaj_bun_venit()) ?></div>
@@ -69,62 +127,5 @@ cap_pagina('Acasă', 'acasa');
   </div>
 </section>
 <?php endif; ?>
-
-<section class="sectiune">
-  <div class="container">
-    <div class="sectiune-titlu fade-up">
-      <div class="ornament"><span class="ln"></span><span class="dot"></span><span class="ln r"></span></div>
-      <h2>Împărtășește momentele</h2>
-      <p>Ai surprins un moment frumos? Încarcă-l aici — pozele și filmele tale ajung direct în albumul nostru. Nu e nevoie de cont.</p>
-    </div>
-
-    <div class="upload-wrap fade-up">
-      <div id="zona-upload">
-        <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Alege poze sau filme">
-          <div class="icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" width="56" height="56">
-              <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5"/>
-              <path d="M4 14v3.5A2.5 2.5 0 0 0 6.5 20h11a2.5 2.5 0 0 0 2.5-2.5V14"/>
-            </svg>
-          </div>
-          <div class="titlu">Încarcă pozele și videoclipurile aici</div>
-          <div class="desc">Poți selecta oricâte deodată, direct de pe telefon</div>
-          <div class="formate">JPG · PNG · HEIC · GIF · MP4 · MOV</div>
-        </div>
-        <input type="file" id="input-fisiere" accept="image/*,video/*" multiple hidden>
-
-        <div class="campuri">
-          <div class="camp">
-            <label for="nume">Numele tău</label>
-            <input type="text" id="nume" maxlength="120" placeholder="ex: Familia Popescu">
-            <div class="ajutor-camp">Scrie-ți numele ca să știm ale cui sunt pozele — opțional, dar ne-ar bucura mult 🤍</div>
-          </div>
-          <div class="camp">
-            <label for="mesaj">Un gând sau o urare pentru miri <span class="optional">(opțional)</span></label>
-            <textarea id="mesaj" maxlength="1000" placeholder="Casă de piatră! Vă dorim o viață plină de iubire..."></textarea>
-          </div>
-        </div>
-
-        <div class="lista-fisiere" id="lista-fisiere"></div>
-
-        <div style="margin-top:18px;text-align:center">
-          <button class="btn btn-primar btn-full" id="btn-incarca" disabled>Încarcă în album</button>
-        </div>
-      </div>
-
-      <div class="card succes-box" id="zona-succes" style="display:none">
-        <div class="check" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="34" height="34"><path d="M20 6L9 17l-5-5"/></svg>
-        </div>
-        <h3>Mulțumim din suflet!</h3>
-        <p id="succes-text">Pozele tale au fost adăugate în album.</p>
-        <div style="margin-top:18px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-          <a class="btn btn-primar" href="galerie.php">Vezi galeria</a>
-          <button class="btn btn-ghost" id="btn-din-nou">Mai încarcă</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
 
 <?php subsol_pagina(); ?>
