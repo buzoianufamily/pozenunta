@@ -72,7 +72,7 @@ cap_pagina('Acasă', 'acasa');
         <h3>Mulțumim din suflet!</h3>
         <p id="succes-text">Pozele tale au fost adăugate în album.</p>
         <div style="margin-top:18px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-          <a class="btn btn-primar" href="galerie.php">Vezi galeria</a>
+          <a class="btn btn-primar" href="galerie">Vezi galeria</a>
           <button class="btn btn-ghost" id="btn-din-nou">Mai încarcă</button>
         </div>
       </div>
@@ -97,13 +97,13 @@ cap_pagina('Acasă', 'acasa');
     </div>
     <div class="galerie">
       <?php foreach ($pozeRecente as $p): ?>
-        <a class="poza vizibil" href="galerie.php" aria-label="Vezi galeria">
+        <a class="poza vizibil" href="galerie" aria-label="Vezi galeria">
           <img loading="lazy" src="<?= h(url_previzualizare($p)) ?>" alt="">
           <?php if ($p['tip'] === 'video'): ?><div class="play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div><?php endif; ?>
         </a>
       <?php endforeach; ?>
     </div>
-    <div style="text-align:center;margin-top:20px"><a class="btn btn-ghost" href="galerie.php">Vezi toată galeria</a></div>
+    <div style="text-align:center;margin-top:20px"><a class="btn btn-ghost" href="galerie">Vezi toată galeria</a></div>
   </div>
 </section>
 <?php endif; ?>
@@ -123,7 +123,7 @@ cap_pagina('Acasă', 'acasa');
         </figure>
       <?php endforeach; ?>
     </div>
-    <div style="text-align:center;margin-top:20px"><a class="btn btn-ghost" href="urari.php">Vezi toate urările</a></div>
+    <div style="text-align:center;margin-top:20px"><a class="btn btn-ghost" href="urari">Vezi toate urările</a></div>
   </div>
 </section>
 <?php endif; ?>

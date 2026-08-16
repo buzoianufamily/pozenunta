@@ -4,6 +4,23 @@ Options -Indexes
 # Pagina de start
 DirectoryIndex index.php
 
+# ---- Adrese curate: /galerie în loc de /galerie.php ----
+# Invitatul poate scrie adresa de mână, iar linkul arată mai îngrijit.
+# Vechile adrese cu .php merg în continuare, ca să nu se strice nimic
+# din ce a fost deja trimis pe WhatsApp.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # /galerie.php -> /galerie  (o singură adresă bună pentru fiecare pagină)
+  RewriteCond %{THE_REQUEST} "\s/+(galerie|urari)\.php[\s?]" [NC]
+  RewriteRule ^ /%1 [R=301,L]
+
+  # /galerie -> galerie.php, pe tăcute
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^(galerie|urari)/?$ $1.php [L]
+</IfModule>
+
 # Nu permite accesul direct la fișiere sensibile
 <FilesMatch "(?i)(config\.php|functions\.php|partiale\.php)$">
   Require all denied

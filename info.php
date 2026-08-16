@@ -57,9 +57,12 @@ rand_raport('Server și PHP', 'Versiune PHP', $phpVer,
 if ($phpMajor < 81) problema('Treci pe PHP 8.1 sau mai nou din cPanel → MultiPHP Manager (mai rapid și încă are suport de securitate).');
 
 $sapi = PHP_SAPI;
+$sapiBun = (stripos($sapi, 'lsapi') !== false || stripos($sapi, 'litespeed') !== false
+            || stripos($sapi, 'fpm') !== false || stripos($sapi, 'cgi') !== false);
 rand_raport('Server și PHP', 'Interfață PHP (SAPI)', $sapi,
-    (stripos($sapi, 'lsapi') !== false || stripos($sapi, 'fpm') !== false) ? 'ok' : 'atentie',
-    (stripos($sapi, 'lsapi') !== false) ? 'LiteSpeed — ideal pentru încărcări multe în paralel.' : '');
+    $sapiBun ? 'ok' : 'atentie',
+    (stripos($sapi, 'lsapi') !== false || stripos($sapi, 'litespeed') !== false)
+        ? 'LiteSpeed — ideal pentru încărcări multe în paralel.' : '');
 
 rand_raport('Server și PHP', 'Software server', (string)($_SERVER['SERVER_SOFTWARE'] ?? 'necunoscut'));
 rand_raport('Server și PHP', 'Sistem', php_uname('s') . ' ' . php_uname('r') . ' (' . php_uname('m') . ')');
@@ -149,6 +152,27 @@ if ($mem >= 0 && $mem < 268435456) {
     problema('memory_limit = ' . om($mem) . '. La poze foarte mari (peste 20 MP) facerea miniaturii poate pica. Recomand 256M.');
 }
 
+/* Ce îi trebuie APLICAȚIEI, nu ce ar fi frumos să fie. Filmele se trimit
+   pe bucăți de 8 MB, deci nu mai are rost să cerem limite uriașe pe o
+   cerere — cerem doar cât să încapă bucata, cu ceva marjă. */
+$minime = [
+    'upload_max_filesize' => ['minim' => $bucata * 2, 'text' => om($bucata * 2), 'de_ce' => 'trebuie să încapă o bucată de ' . om($bucata)],
+    'post_max_size'       => ['minim' => $bucata * 2, 'text' => om($bucata * 2), 'de_ce' => 'la fel: o bucată plus antetul cererii'],
+    'memory_limit'        => ['minim' => 256 * 1024 * 1024, 'text' => '256M', 'de_ce' => 'miniatura unei poze mari nemicșorate'],
+    'max_execution_time'  => ['minim' => 60,  'text' => '60 s',  'de_ce' => 'prelucrarea unei bucăți durează secunde'],
+    'max_input_time'      => ['minim' => 120, 'text' => '120 s', 'de_ce' => 'primirea unei bucăți pe conexiune slabă'],
+    'max_file_uploads'    => ['minim' => 5,   'text' => '5',     'de_ce' => 'aplicația trimite un fișier (plus miniatura filmului)'],
+];
+
+/* Verificăm dacă valorile ACTIVE ajung. Doar dacă nu ajung avem o problemă. */
+$subMinim = [];
+foreach ($minime as $cheie => $m) {
+    $acum = (string)ini_get($cheie);
+    $val  = preg_match('/[kmg]$/i', $acum) ? ini_octeti($acum) : (int)$acum;
+    if ($val === 0 || $val === -1) continue;              // nelimitat
+    if ($val < $m['minim']) $subMinim[] = $cheie;
+}
+
 /* ============================================================
    2b. FIȘIERUL .user.ini — se aplică sau nu?
    ------------------------------------------------------------
@@ -188,10 +212,18 @@ if (!is_file($caleUserIni)) {
             $laFel ? 'ok' : 'rau', $laFel ? 'se aplică' : 'NU se aplică');
     }
     if ($nepotrivite > 0) {
-        problema('Fișierul ' . $numeUserIni . ' există lângă aplicație, dar ' . $nepotrivite
-            . ' valori din el nu se aplică. Fie nu au trecut încă cele '
-            . (int)ini_get('user_ini.cache_ttl') . ' de secunde de reîmprospătare, fie găzduirea nu permite'
-            . ' schimbarea lor din acest fișier. Verifică în cPanel → MultiPHP INI Editor, pe domeniul corect.');
+        /* Că fișierul nu se aplică e supărător, dar nu e o defecțiune atâta
+           vreme cât valorile active ajung aplicației. Problemă declarăm doar
+           dacă lipsește ceva cu adevărat. */
+        $textUserIni = 'Cele ' . $nepotrivite . ' valori din ' . $numeUserIni
+            . ' nu se aplică — găzduirea nu permite schimbarea lor din acest fișier';
+        if (empty($subMinim)) {
+            rand_raport('Fișierul .user.ini', '➜ Contează?', 'NU', 'ok',
+                $textUserIni . '. Valorile active ale serverului sunt însă peste ce cere aplicația, deci nu ai nimic de făcut. Poți șterge fișierul.');
+        } else {
+            problema($textUserIni . ', iar valorile active NU ajung pentru: '
+                . implode(', ', $subMinim) . '. Cere-i gazdei să le mărească.');
+        }
     }
 }
 
@@ -407,6 +439,27 @@ if ($liber !== false && $total !== false && $total > 0) {
 } else {
     rand_raport('Spațiu pe disc', 'Citire spațiu', 'indisponibilă', 'atentie', 'Găzduirea nu permite disk_free_space(). Vezi cPanel → Disk Usage.');
 }
+/* Fișiere rămase pe disc fără rând în baza de date. Se întâmplă după
+   ștergeri făcute direct din File Manager sau după o reinstalare a
+   bazei: ocupă spațiu degeaba și nu se văd nicăieri în album. */
+if ($nrFisiere > 0 && isset($pdo)) {
+    try {
+        $inBd = (int)$pdo->query('SELECT COUNT(*) FROM poze')->fetchColumn();
+        /* fiecare poză are fișierul ei plus, de obicei, o miniatură */
+        $orfane = $nrFisiere - ($inBd * 2);
+        if ($inBd === 0 && $nrFisiere > 2) {
+            rand_raport('Spațiu pe disc', 'Fișiere fără rând în album', (string)$nrFisiere, 'atentie',
+                'Baza de date nu are nicio poză, dar în uploads/ sunt ' . $nrFisiere
+                . ' fișiere care ocupă ' . om($dimUploads) . '. Sunt rămase din încercări: se pot șterge liniștit prin File Manager.');
+            problema('În uploads/ au rămas ' . $nrFisiere . ' fișiere (' . om($dimUploads)
+                . ') care nu apar în album, pentru că baza de date e goală. Șterge conținutul folderului uploads/ (păstrează index.html, .htaccess și folderul thumbs) ca să pornești curat.');
+        } elseif ($orfane > 5) {
+            rand_raport('Spațiu pe disc', 'Fișiere fără rând în album', '~' . $orfane, 'atentie',
+                'Mai multe fișiere pe disc decât în baza de date. Probabil rămase după ștergeri făcute din File Manager.');
+        }
+    } catch (Throwable $e) { /* fără baza de date nu putem compara */ }
+}
+
 rand_raport('Spațiu pe disc', 'Atenție la cifrele de mai sus',
     'sunt ale întregului server, nu ale contului tău', 'atentie',
     'Pe găzduire partajată discul e împărțit cu alții. Cifra care te privește e cota contului, din cPanel → Disk Usage.');
@@ -519,14 +572,6 @@ foreach ($necesare as $e => $rol) {
 /* ============================================================
    Recomandări de valori pentru .user.ini
    ============================================================ */
-$recomandari = [
-    'upload_max_filesize' => '1024M',
-    'post_max_size'       => '1024M',
-    'memory_limit'        => '256M',
-    'max_execution_time'  => '600',
-    'max_input_time'      => '600',
-    'max_file_uploads'    => '50',
-];
 
 /* Rezumat text, de copiat ușor */
 $rezumat = "=== DIAGNOSTIC " . SITE_URL . " · " . date('d.m.Y H:i') . " ===\n";
@@ -661,41 +706,47 @@ $simbol = ['ok' => '✓', 'atentie' => '!', 'rau' => '✕', 'info' => '·'];
   <?php endif; ?>
 
   <div class="card">
-    <h2>Valori recomandate</h2>
+    <h2>De cât are nevoie aplicația</h2>
     <table>
-      <?php
-      /* „0" la timpi și „-1" înseamnă nelimitat — adică mai bun decât recomandarea. */
-      $fara_limita = ['max_execution_time' => [0], 'max_input_time' => [0, -1]];
-      foreach ($recomandari as $k => $v):
+      <tr><td colspan="4" style="padding-bottom:4px">
+        <span class="mic">Filmele se trimit pe bucăți de <?= h(om($bucata)) ?>, deci nu sunt necesare
+        limite uriașe pe o cerere. Mai jos e minimul de care are nevoie aplicația —
+        nu ce ar fi frumos să fie.</span>
+      </td></tr>
+      <?php foreach ($minime as $k => $m):
         $acum = (string)ini_get($k);
-        $potrivit = isset($fara_limita[$k]) && in_array((int)$acum, $fara_limita[$k], true)
-                    ? true
-                    : ini_octeti($acum) >= ini_octeti($v);
+        $val  = preg_match('/[kmg]$/i', $acum) ? ini_octeti($acum) : (int)$acum;
+        $nelimitat = ($val === 0 || $val === -1);
+        $potrivit  = $nelimitat || $val >= $m['minim'];
       ?>
         <tr>
-          <td class="st" style="color:<?= $potrivit ? $culori['ok'] : $culori['atentie'] ?>"><?= $potrivit ? '✓' : '!' ?></td>
+          <td class="st" style="color:<?= $potrivit ? $culori['ok'] : $culori['rau'] ?>"><?= $potrivit ? '✓' : '✕' ?></td>
           <td class="et"><code><?= h($k) ?></code></td>
           <td class="vl" colspan="2">
-            <?= h($v) ?>
-            <span class="nota">acum: <?= h($acum !== '' ? $acum : '(gol)') ?></span>
+            ai <?= h($acum !== '' ? $acum : '(gol)') ?>, trebuie cel puțin <?= h($m['text']) ?>
+            <span class="nota"><?= h($m['de_ce']) ?></span>
           </td>
         </tr>
       <?php endforeach; ?>
     </table>
   </div>
 
+  <?php if (!empty($subMinim)): ?>
   <div class="card">
-    <h2>Cum schimbi valorile în cPanel</h2>
+    <h2>Cum mărești valorile în cPanel</h2>
     <table><tr><td colspan="4">
-      <p style="margin-top:0"><strong>Varianta 1 (cea mai simplă):</strong> cPanel →
-        <em>MultiPHP INI Editor</em> → alege domeniul → pune valorile din tabelul de mai sus → <em>Apply</em>.</p>
-      <p><strong>Varianta 2:</strong> creezi un fișier <code>.user.ini</code> în <code>public_html</code> cu:</p>
-      <pre><?php foreach ($recomandari as $k => $v) { echo h($k) . ' = ' . h($v) . "\n"; } ?></pre>
-      <p class="mic">Schimbările din <code>.user.ini</code> se aplică în câteva minute (PHP le recitește periodic).
-        Dacă gazda nu îți permite valori atât de mari, scrie-le pe cele mai mari acceptate și spune-mi ce a ieșit —
-        ajustăm aplicația să fie sinceră cu invitații.</p>
+      <p style="margin-top:0">
+        Valorile active nu ajung pentru: <strong><?= h(implode(', ', $subMinim)) ?></strong>.
+        Mergi în cPanel → <em>MultiPHP INI Editor</em>, alege
+        <strong><?= h((string)($_SERVER['HTTP_HOST'] ?? '')) ?></strong> și pune cel puțin:
+      </p>
+      <pre><?php foreach ($subMinim as $k) { echo h($k) . ' = ' . h($minime[$k]['text']) . "\n"; } ?></pre>
+      <p class="mic">Dacă găzduirea nu permite, cere-i gazdei să le mărească ea — sunt valori mici,
+        obișnuite. Un fișier <code>.user.ini</code> pus de tine poate fi ignorat, iar atunci nu se
+        vede nicăieri că a fost ignorat.</p>
     </td></tr></table>
   </div>
+  <?php endif; ?>
 
   <div class="card">
     <h2>Rezumat de copiat</h2>

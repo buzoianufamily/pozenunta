@@ -27,7 +27,7 @@ cap_pagina('Galerie', 'galerie');
     <div class="sentinela" id="sentinela"></div>
     <div class="gol" id="gol" style="display:none">
       Albumul așteaptă primele voastre fotografii. <br>
-      <a class="btn btn-primar" style="margin-top:18px" href="index.php">Încarcă o poză sau video</a>
+      <a class="btn btn-primar" style="margin-top:18px" href="/">Încarcă o poză sau video</a>
     </div>
   </div>
 </section>
