@@ -162,6 +162,9 @@
     /* Reluarea e ieftină (continuă din punctul rămas), deci are rost să
        insistăm mai mult înainte să renunțăm la un fișier. */
     var BUCATA_TRIES = 5, BUCATA_BACKOFF = [1000, 3000, 6000, 12000, 20000];
+    /* Peste atât nu mai păstrăm o copie în telefon pentru reluarea de
+       mâine — ar ocupa cât filmul însuși. */
+    var PRAG_PASTRARE = 300 * 1024 * 1024;
 
     function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 
@@ -441,7 +444,20 @@
           try {
             setStare(item, 'Se pregătește…', 0);
             await proceseazaItem(item);
-            try { await idbPut({ id: item.id, sid: item.sid, blob: item.blob, poster: item.poster || null, name: item.name, nume: item.nume, mesaj: item.mesaj, isVideo: item.isVideo }); item.persisted = true; } catch (e) { item.persisted = false; }
+            /* Pentru reluarea de mâine păstrăm o copie a fișierului în
+               telefon. La filmele foarte mari nu are rost: copia ar
+               dura mult și ar umple memoria telefonului degeaba. Acolo
+               reluarea merge oricum cât timp pagina rămâne deschisă,
+               pentru că serverul ține minte cât a primit. */
+            if (item.blob && item.blob.size <= PRAG_PASTRARE) {
+              try {
+                await idbPut({ id: item.id, sid: item.sid, blob: item.blob, poster: item.poster || null,
+                               name: item.name, nume: item.nume, mesaj: item.mesaj, isVideo: item.isVideo });
+                item.persisted = true;
+              } catch (e) { item.persisted = false; }
+            } else {
+              item.persisted = false;
+            }
             var ok = await urcaCuReincercare(item);
             if (ok) {
               item.status = 'done'; item.row.classList.add('gata');

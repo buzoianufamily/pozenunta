@@ -29,9 +29,11 @@ define('ADMIN_USER', 'Razvan');
 define('ADMIN_PASS', 'R0765793713iPhone!');
 
 /* ---------- 4. SETĂRI ÎNCĂRCARE ---------- */
-// Dimensiunea maximă per fișier. 1 GB = limita serverului tău; practic fără limită pentru o nuntă.
-// Pozele se micșorează automat pe telefon, deci sunt mici oricum; filmele pot ajunge până la 1 GB.
-define('MAX_FILE_SIZE', 1024 * 1024 * 1024);
+// Dimensiunea maximă per fișier. Filmele se trimit pe bucăți, deci limita
+// serverului pe o singură cerere nu contează aici — contează doar spațiul
+// pe disc și răbdarea invitatului: 4 GB de pe 4G înseamnă aproape două ore.
+// Pozele se micșorează automat pe telefon, deci rămân mici oricum.
+define('MAX_FILE_SIZE', 4 * 1024 * 1024 * 1024);
 // Lățimea miniaturilor generate pentru galerie (px). Mai mic = galerie mai rapidă.
 define('THUMB_WIDTH', 600);
 // Câte poze se încarcă odată în galerie (scroll infinit).

@@ -52,6 +52,24 @@ function are_index(?PDO $p, string $t, string $i): ?int {
     return nr($p, 'SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?', [$t, $i]);
 }
 
+/* Coloana care ține mărimea fișierului trebuie să încapă filme mari.
+   Un INT obișnuit se oprește la 2 GB, iar tabela veche, creată de
+   instalarea dinainte, are de obicei INT. Peste 2 GB, mărimea s-ar
+   salva greșit sau ar da eroare. */
+function marime_incape_mare(?PDO $p): ?int {
+    if (!$p) return null;
+    try {
+        $st = $p->prepare(
+            'SELECT DATA_TYPE FROM information_schema.columns
+             WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?'
+        );
+        $st->execute(['poze', 'marime']);
+        $tip = $st->fetchColumn();
+        if ($tip === false) return 0;                      // coloana lipsește
+        return strtolower((string)$tip) === 'bigint' ? 1 : 0;
+    } catch (Throwable $e) { return null; }
+}
+
 /* ============================================================
    TOT CE ARE NEVOIE APLICAȚIA
    Ordinea contează: întâi tabelele, apoi coloanele, apoi indexurile.
@@ -115,6 +133,10 @@ $pasi[] = ['coloana', 'poze', 'amprenta_fisier', 'Depistarea duplicatelor',
 $pasi[] = ['coloana', 'urari', 'jeton', 'Cine a scris urarea',
     'ALTER TABLE urari ADD COLUMN jeton VARCHAR(64) DEFAULT NULL'];
 
+/* Lărgirea coloanei de mărime, ca să încapă filme de peste 2 GB. */
+$pasi[] = ['tip', 'poze', 'marime', 'Mărimea fișierului (filme mari)',
+    'ALTER TABLE poze MODIFY marime BIGINT UNSIGNED NOT NULL DEFAULT 0'];
+
 /* ---------- indexuri ---------- */
 $pasi[] = ['index', 'poze', 'idx_galerie', 'Galeria, sortare după dată',
     'CREATE INDEX idx_galerie ON poze (aprobat, data_incarcare, id)'];
@@ -129,6 +151,14 @@ $pasi[] = ['index', 'urari', 'idx_aprobat', 'Lista de urări',
 $pasi[] = ['index', 'urari', 'idx_jeton', 'Urările proprii',
     'CREATE INDEX idx_jeton ON urari (jeton)'];
 
+/* Numele arătat în pagină pentru fiecare pas. */
+function eticheta_pas(string $fel, string $tabela, ?string $nume): string {
+    if ($fel === 'tabela')  return "Tabela $tabela";
+    if ($fel === 'coloana') return "$tabela.$nume";
+    if ($fel === 'tip')     return "$tabela.$nume (încape filme mari)";
+    return "Index $nume ($tabela)";
+}
+
 /* Starea curentă a fiecărui pas: 1 există, 0 lipsește, null necunoscut.
 
    Atenție la numărătoare: în catalog, un index pe mai multe coloane apare
@@ -140,6 +170,9 @@ function starea_pasului(?PDO $pdo, array $pas): ?int {
 
     if ($fel === 'tabela') {
         $n = are_tabela($pdo, $tabela);
+    } elseif ($fel === 'tip') {
+        if (!are_tabela($pdo, $tabela)) return 0;
+        $n = marime_incape_mare($pdo);
     } elseif ($fel === 'coloana') {
         if (!are_tabela($pdo, $tabela)) return 0;   // fără tabelă, nici coloana
         $n = are_coloana($pdo, $tabela, $nume);
@@ -164,8 +197,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $pdo) {
         $aRulat = true;
         foreach ($pasi as $pas) {
             [$fel, $tabela, $nume, $descriere, $sql] = $pas;
-            $eticheta = $fel === 'tabela' ? "Tabela $tabela"
-                      : ($fel === 'coloana' ? "$tabela.$nume" : "Index $nume ($tabela)");
+            $eticheta = eticheta_pas($fel, $tabela, $nume);
 
             if (starea_pasului($pdo, $pas) === 1) {
                 $rezultate[] = ['sarit', "$eticheta — există deja"];
@@ -285,8 +317,7 @@ $culori = ['ok' => '#1B7F4E', 'sarit' => '#5A6B72', 'rau' => '#B3261E'];
         <?php foreach ($pasi as $pas):
           [$fel, $tabela, $nume, $descriere] = $pas;
           $st = starea_pasului($pdo, $pas);
-          $eticheta = $fel === 'tabela' ? "Tabela $tabela"
-                    : ($fel === 'coloana' ? "$tabela.$nume" : "Index $nume ($tabela)");
+          $eticheta = eticheta_pas($fel, $tabela, $nume);
           $semn  = $st === 1 ? '✓' : ($st === null ? '?' : '✕');
           $culoare = $st === 1 ? $culori['ok'] : ($st === null ? '#B5730F' : $culori['rau']);
         ?>
