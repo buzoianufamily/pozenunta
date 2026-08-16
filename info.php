@@ -113,9 +113,23 @@ rand_raport('Limite de încărcare', 'max_file_uploads', (string)$maxFi,
 
 rand_raport('Limite de încărcare', 'MAX_FILE_SIZE (config.php)', om(MAX_FILE_SIZE), 'info', 'Limita pusă de aplicație.');
 
-rand_raport('Limite de încărcare', '➜ LIMITA REALĂ pe fișier', om((int)$limitaReala),
-    $limitaReala >= 536870912 ? 'ok' : ($limitaReala >= 134217728 ? 'atentie' : 'rau'),
-    'Cea mai mică dintre limitele de mai sus — asta simte invitatul.');
+/* Filmele nu mai pleacă într-o singură cerere: se trimit pe bucăți.
+   Deci limita serverului pe cerere mărginește doar bucata, nu filmul
+   întreg — un film de 4 GB încape chiar dacă serverul acceptă 1 GB
+   pe cerere. Mărginite de limita pe cerere rămân doar pozele, care
+   merg dintr-o bucată; dar ele sunt micșorate în telefon la 1-2 MB. */
+$bucata = dimensiune_bucata();
+
+rand_raport('Limite de încărcare', 'Bucata la filmele mari', om($bucata),
+    $bucata <= $limitaServer ? 'ok' : 'rau',
+    'Filmele se trimit pe bucăți de atât, deci mărimea lor totală nu e îngrădită de limita pe cerere.');
+
+rand_raport('Limite de încărcare', '➜ LIMITA REALĂ, film', om(MAX_FILE_SIZE),
+    'ok', 'Se trimite pe bucăți, deci contează doar spațiul pe disc și răbdarea invitatului.');
+
+rand_raport('Limite de încărcare', '➜ LIMITA REALĂ, poză', om((int)$limitaServer),
+    $limitaServer >= 33554432 ? 'ok' : 'atentie',
+    'Pozele merg dintr-o bucată, dar se micșorează în telefon la 1-2 MB.');
 
 rand_raport('Limite de încărcare', 'Limită per invitat', 'NU există',
     'ok', 'Fiecare invitat poate încărca oricâte fișiere. Singura limită e spațiul pe disc.');
@@ -123,8 +137,10 @@ rand_raport('Limite de încărcare', 'Limită per invitat', 'NU există',
 if ($pms > 0 && $pms < $umf) {
     problema('post_max_size (' . om($pms) . ') e mai mic decât upload_max_filesize (' . om($umf) . ') — limita reală scade la ' . om($pms) . '. Fă-le egale.');
 }
-if ($limitaServer > 0 && MAX_FILE_SIZE > $limitaServer) {
-    problema('config.php promite ' . om(MAX_FILE_SIZE) . ' pe fișier, dar serverul acceptă doar ' . om($limitaServer) . '. Filmele mai mari eșuează. Ori mărești limitele serverului, ori cobori MAX_FILE_SIZE ca să fie sincer.');
+/* Singura nepotrivire care chiar strică: bucata nu încape în cerere. */
+if ($limitaServer > 0 && $bucata > $limitaServer) {
+    problema('Bucata folosită la filme (' . om($bucata) . ') e mai mare decât acceptă serverul într-o cerere ('
+        . om($limitaServer) . '). Toate încărcările de filme ar eșua.');
 }
 if ($maxIn >= 0 && $maxIn < 300) {
     problema('max_input_time = ' . $maxIn . 's e mic. Un film de 500 MB pe 4G lent poate depăși timpul și se rupe încărcarea. Recomand 600 sau -1.');
@@ -345,16 +361,29 @@ if ($liber !== false && $total !== false && $total > 0) {
 } else {
     rand_raport('Spațiu pe disc', 'Citire spațiu', 'indisponibilă', 'atentie', 'Găzduirea nu permite disk_free_space(). Vezi cPanel → Disk Usage.');
 }
-rand_raport('Spațiu pe disc', 'DISK_QUOTA_GB (config)', DISK_QUOTA_GB . ' GB', 'info', 'Doar pentru bara din panou. Mărește-l când cumperi spațiu.');
-rand_raport('Spațiu pe disc', 'Ocupat de uploads/', $nrFisiere >= 0 ? om($dimUploads) . ' · ' . $nrFisiere . ' fișiere' : 'nu s-a putut citi');
+rand_raport('Spațiu pe disc', 'Atenție la cifrele de mai sus',
+    'sunt ale întregului server, nu ale contului tău', 'atentie',
+    'Pe găzduire partajată discul e împărțit cu alții. Cifra care te privește e cota contului, din cPanel → Disk Usage.');
 
-/* Estimare: câte poze/filme mai încap */
-if ($liber !== false) {
-    $estPoze  = (int)floor($liber / (2 * 1024 * 1024));    // ~2 MB/poză după micșorare
-    $estFilme = (int)floor($liber / (60 * 1024 * 1024));   // ~60 MB/film scurt
+rand_raport('Spațiu pe disc', '➜ Cota contului (DISK_QUOTA_GB)', DISK_QUOTA_GB . ' GB', 'info',
+    'Asta e limita ta adevărată. Actualizeaz-o în config.php când cumperi spațiu.');
+
+$ocupat = $nrFisiere >= 0 ? $dimUploads : 0;
+$cotaOcteti = DISK_QUOTA_GB * 1024 * 1024 * 1024;
+$procCota = $cotaOcteti > 0 ? round($ocupat / $cotaOcteti * 100, 1) : 0;
+rand_raport('Spațiu pe disc', 'Ocupat de album',
+    ($nrFisiere >= 0 ? om($ocupat) . ' · ' . $nrFisiere . ' fișiere' : 'nu s-a putut citi')
+    . ($nrFisiere >= 0 ? '  (' . $procCota . '% din cotă)' : ''),
+    $procCota < 75 ? 'ok' : ($procCota < 90 ? 'atentie' : 'rau'));
+
+/* Estimare, raportată la cota contului — nu la discul serverului. */
+if ($nrFisiere >= 0) {
+    $ramas = max(0, $cotaOcteti - $ocupat);
+    $estPoze  = (int)floor($ramas / (2 * 1024 * 1024));     // ~2 MB/poză după micșorare
+    $estFilme = (int)floor($ramas / (60 * 1024 * 1024));    // ~60 MB/film scurt
     rand_raport('Spațiu pe disc', '➜ Mai încap aproximativ',
         number_format($estPoze, 0, ',', '.') . ' poze SAU ' . number_format($estFilme, 0, ',', '.') . ' filme scurte',
-        'info', 'Estimare: ~2 MB/poză (după micșorarea din telefon), ~60 MB/film de un minut.');
+        'info', 'Din cota ta rămasă (' . om($ramas) . '): ~2 MB/poză, ~60 MB/film de un minut.');
 }
 
 /* ============================================================
@@ -462,7 +491,8 @@ $rezumat .= "upload_max_filesize=" . ini_get('upload_max_filesize')
           . " max_execution_time=" . $maxEx
           . " max_input_time=" . $maxIn
           . " max_file_uploads=" . $maxFi . "\n";
-$rezumat .= "LIMITA REALA pe fisier: " . om((int)$limitaReala) . " (config: " . om(MAX_FILE_SIZE) . ")\n";
+$rezumat .= "Limita film: " . om(MAX_FILE_SIZE) . " (pe bucati de " . om($bucata)
+          . ") | limita poza: " . om((int)$limitaServer) . "\n";
 $rezumat .= "GD=" . ($areGd ? 'da' : 'NU') . " EXIF=" . ($areExif ? 'da' : 'NU') . " Imagick=" . ($areImagick ? 'da' : 'nu')
           . " OPcache=" . (!is_array($op) ? 'indisponibil' : (!empty($op['opcache_enabled']) ? 'pornit' : 'oprit')) . "\n";
 if ($liber !== false && $total !== false) {
