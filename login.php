@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       </div>
       <button class="btn btn-primar btn-full" type="submit">Autentificare</button>
     </form>
-    <p style="margin-top:18px"><a href="index.php" style="font-size:.84rem;color:var(--muted)">← Înapoi la album</a></p>
+    <p style="margin-top:18px"><a href="/" style="font-size:.84rem;color:var(--muted)">← Înapoi la album</a></p>
   </div>
 </div>
 </body>

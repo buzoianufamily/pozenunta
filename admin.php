@@ -167,8 +167,8 @@ $poze = $stmt->fetchAll();
       <span class="date" style="color:#9c8f78">Administrare</span>
     </div>
     <nav class="nav-links">
-      <a href="index.php" target="_blank">Pagina de încărcare</a>
-      <a href="galerie.php" target="_blank">Galerie publică</a>
+      <a href="/" target="_blank">Pagina de încărcare</a>
+      <a href="galerie" target="_blank">Galerie publică</a>
       <a href="logout.php">Ieșire (<?= h($_SESSION['admin_user'] ?? 'admin') ?>)</a>
     </nav>
   </div>
