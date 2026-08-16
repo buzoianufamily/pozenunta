@@ -495,9 +495,11 @@ $rezumat .= "Limita film: " . om(MAX_FILE_SIZE) . " (pe bucati de " . om($bucata
           . ") | limita poza: " . om((int)$limitaServer) . "\n";
 $rezumat .= "GD=" . ($areGd ? 'da' : 'NU') . " EXIF=" . ($areExif ? 'da' : 'NU') . " Imagick=" . ($areImagick ? 'da' : 'nu')
           . " OPcache=" . (!is_array($op) ? 'indisponibil' : (!empty($op['opcache_enabled']) ? 'pornit' : 'oprit')) . "\n";
-if ($liber !== false && $total !== false) {
-    $rezumat .= "Disc: liber " . om((int)$liber) . " din " . om((int)$total) . " · uploads/ = " . om($dimUploads) . " ($nrFisiere fisiere)\n";
-}
+/* Raportăm cota contului, nu discul serverului: acela e împărțit cu alți
+   clienți, arată zeci de terabiți și nu spune nimic despre cât ai tu. */
+$rezumat .= "Album: " . om($ocupat) . " din cota de " . DISK_QUOTA_GB . " GB"
+          . " (" . $procCota . "%) · " . max(0, $nrFisiere) . " fisiere"
+          . " · mai incap " . om(max(0, $cotaOcteti - $ocupat)) . "\n";
 $rezumat .= "CPU: " . ($nuclee ?: '?') . " nuclee\n";
 /* Fără conexiune nu s-a verificat nimic — a spune „completă" ar fi o
    liniștire falsă, exact ce reproșăm numărului de versiune. */
