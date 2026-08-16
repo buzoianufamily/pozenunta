@@ -150,6 +150,52 @@ if ($mem >= 0 && $mem < 268435456) {
 }
 
 /* ============================================================
+   2b. FIȘIERUL .user.ini — se aplică sau nu?
+   ------------------------------------------------------------
+   Fișierul se citește doar din folderul site-ului (și din
+   subfolderele lui). Pus lângă alt domeniu, nu are niciun efect —
+   iar asta nu se vede nicăieri, decât comparând valorile scrise cu
+   cele pe care le raportează serverul.
+   ============================================================ */
+$numeUserIni = (string)(ini_get('user_ini.filename') ?: '.user.ini');
+$caleUserIni = __DIR__ . '/' . $numeUserIni;
+
+rand_raport('Fișierul .user.ini', 'Numele căutat de PHP', $numeUserIni, 'info',
+    'Se citește din folderul site-ului. Reîmprospătarea durează până la '
+    . (int)ini_get('user_ini.cache_ttl') . ' secunde.');
+
+if (!is_file($caleUserIni)) {
+    rand_raport('Fișierul .user.ini', 'Există lângă aplicație?', 'NU', 'info',
+        'Se folosesc valorile serverului. Dacă ai editat un ' . $numeUserIni
+        . ' și nu vezi schimbările, e pus în alt folder decât ' . __DIR__);
+} else {
+    rand_raport('Fișierul .user.ini', 'Există lângă aplicație?', 'da', 'ok', $caleUserIni);
+
+    $scrise = @parse_ini_file($caleUserIni, false, INI_SCANNER_RAW) ?: [];
+    $nepotrivite = 0;
+    foreach ($scrise as $cheie => $valoare) {
+        $cheie = trim((string)$cheie);
+        if (!in_array($cheie, ['upload_max_filesize','post_max_size','memory_limit',
+                               'max_execution_time','max_input_time','max_file_uploads'], true)) continue;
+        $acum  = (string)ini_get($cheie);
+        $scris = trim((string)$valoare);
+        /* comparăm ca octeți unde are sens, altfel ca numere */
+        $laFel = preg_match('/[kmg]$/i', $scris)
+               ? ini_octeti($scris) === ini_octeti($acum)
+               : (int)$scris === (int)$acum;
+        if (!$laFel) $nepotrivite++;
+        rand_raport('Fișierul .user.ini', $cheie, 'scris ' . $scris . ' · activ ' . ($acum !== '' ? $acum : '(gol)'),
+            $laFel ? 'ok' : 'rau', $laFel ? 'se aplică' : 'NU se aplică');
+    }
+    if ($nepotrivite > 0) {
+        problema('Fișierul ' . $numeUserIni . ' există lângă aplicație, dar ' . $nepotrivite
+            . ' valori din el nu se aplică. Fie nu au trecut încă cele '
+            . (int)ini_get('user_ini.cache_ttl') . ' de secunde de reîmprospătare, fie găzduirea nu permite'
+            . ' schimbarea lor din acest fișier. Verifică în cPanel → MultiPHP INI Editor, pe domeniul corect.');
+    }
+}
+
+/* ============================================================
    3. PRELUCRAREA IMAGINILOR
    ============================================================ */
 $areGd = extension_loaded('gd');
