@@ -166,11 +166,56 @@ function csrf_valid(?string $token): bool {
 }
 
 /* ============================================================
-   GENERARE MINIATURĂ (thumbnail) cu GD
-   Returnează true dacă a creat miniatura, false dacă nu a putut
-   (ex: format HEIC nesuportat de GD pe server).
+   MINIATURI
+   ------------------------------------------------------------
+   Întâi cu GD, care e rapid și ajunge pentru JPEG și PNG. Dacă nu
+   reușește — cazul tipic fiind HEIC-ul de pe iPhone, pe care GD nu
+   îl poate citi — încercăm cu Imagick, dacă serverul îl are.
+
+   Contează pentru că pozele de pe iPhone se transformă de obicei în
+   telefon înainte de trimitere; dar pe un telefon vechi sau cu
+   memoria plină transformarea poate să nu reușească, iar atunci
+   fișierul ajunge aici așa cum e.
    ============================================================ */
+function imagick_poate_heic(): bool {
+    static $poate = null;
+    if ($poate !== null) return $poate;
+    if (!extension_loaded('imagick') || !class_exists('Imagick')) return $poate = false;
+    try {
+        $f = @Imagick::queryFormats('HEIC') ?: [];
+        $g = @Imagick::queryFormats('HEIF') ?: [];
+        return $poate = (!empty($f) || !empty($g));
+    } catch (Throwable $e) { return $poate = false; }
+}
+
+/* Miniatură cu Imagick. Îi punem frâu la memorie, ca o poză uriașă
+   să nu tragă serverul după ea. */
+function thumbnail_imagick(string $sursa, string $destinatie, int $latimeMax): bool {
+    if (!extension_loaded('imagick') || !class_exists('Imagick')) return false;
+    try {
+        $im = new Imagick();
+        $im->setResourceLimit(Imagick::RESOURCETYPE_MEMORY, 256 * 1024 * 1024);
+        $im->setResourceLimit(Imagick::RESOURCETYPE_MAP,    256 * 1024 * 1024);
+        $im->readImage($sursa);
+        if ($im->getNumberImages() > 1) { $im->setIteratorIndex(0); }
+        $im = $im->coalesceImages();
+        if (method_exists($im, 'autoOrient')) { @$im->autoOrient(); }   // rotirea din EXIF
+        $im->setImageFormat('jpeg');
+        $im->setImageCompressionQuality(82);
+        $im->thumbnailImage($latimeMax, 0);
+        $im->stripImage();                                             // scoate datele EXIF
+        $ok = $im->writeImage($destinatie);
+        $im->clear(); $im->destroy();
+        return (bool)$ok;
+    } catch (Throwable $e) { return false; }
+}
+
 function creeaza_thumbnail(string $sursa, string $destinatie, int $latimeMax = THUMB_WIDTH): bool {
+    if (thumbnail_gd($sursa, $destinatie, $latimeMax)) return true;
+    return thumbnail_imagick($sursa, $destinatie, $latimeMax);
+}
+
+function thumbnail_gd(string $sursa, string $destinatie, int $latimeMax = THUMB_WIDTH): bool {
     if (!function_exists('imagecreatetruecolor')) return false;
     $info = @getimagesize($sursa);
     if ($info === false) return false;
@@ -216,6 +261,42 @@ function creeaza_thumbnail(string $sursa, string $destinatie, int $latimeMax = T
     imagedestroy($img);
     imagedestroy($thumb);
     return $ok;
+}
+
+/* ------------------------------------------------------------
+   HEIC → JPEG, pe server
+   Un fișier HEIC lăsat așa se vede pe iPhone, dar NU pe Android sau
+   pe calculator. Dacă telefonul nu l-a transformat înainte de
+   trimitere, îl transformăm noi — altfel jumătate dintre invitați ar
+   vedea un pătrat gol în galerie.
+   Întoarce noua cale dacă a transformat, altfel null.
+   ------------------------------------------------------------ */
+function converteste_heic(string $cale): ?string {
+    $ext = strtolower(pathinfo($cale, PATHINFO_EXTENSION));
+    if ($ext !== 'heic' && $ext !== 'heif') return null;
+    if (!imagick_poate_heic()) return null;
+
+    $nou = preg_replace('/\.(heic|heif)$/i', '.jpg', $cale);
+    if (!$nou || $nou === $cale) return null;
+
+    try {
+        $im = new Imagick();
+        $im->setResourceLimit(Imagick::RESOURCETYPE_MEMORY, 512 * 1024 * 1024);
+        $im->setResourceLimit(Imagick::RESOURCETYPE_MAP,    512 * 1024 * 1024);
+        $im->readImage($cale);
+        if ($im->getNumberImages() > 1) { $im->setIteratorIndex(0); }
+        $im = $im->coalesceImages();
+        if (method_exists($im, 'autoOrient')) { @$im->autoOrient(); }
+        $im->setImageFormat('jpeg');
+        $im->setImageCompressionQuality(88);   // e originalul, nu miniatura
+        $ok = $im->writeImage($nou);
+        $im->clear(); $im->destroy();
+        if (!$ok || !is_file($nou)) return null;
+    } catch (Throwable $e) { return null; }
+
+    @unlink($cale);          // originalul nu mai e de folos nimănui
+    @chmod($nou, 0644);
+    return $nou;
 }
 
 /* URL-ul de afișat în galerie pentru o poză:

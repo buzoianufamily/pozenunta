@@ -107,6 +107,13 @@ foreach ($fisiere as $f) {
     }
     @chmod($destinatie, 0644);
 
+    /* HEIC nevăzut de Android: îl transformăm noi, dacă telefonul n-a putut. */
+    $convertit = converteste_heic($destinatie);
+    if ($convertit !== null) {
+        $destinatie = $convertit;
+        $numeFisier = basename($convertit);
+    }
+
     // miniatură: imaginile din original, filmele din posterul trimis de telefon
     if ($tip === 'imagine') {
         @creeaza_thumbnail($destinatie, THUMB_DIR . $numeFisier . '.jpg');

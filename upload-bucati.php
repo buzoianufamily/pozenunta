@@ -233,6 +233,13 @@ if ($actiune === 'finalizeaza') {
     }
     @chmod($destinatie, 0644);
 
+    /* HEIC nevăzut de Android: îl transformăm noi, dacă telefonul n-a putut. */
+    $convertit = converteste_heic($destinatie);
+    if ($convertit !== null) {
+        $destinatie = $convertit;
+        $numeFisier = basename($convertit);
+    }
+
     /* Miniatura: imaginile din fișierul propriu-zis, filmele din
        posterul trimis de telefon. */
     if ($tip === 'imagine') {

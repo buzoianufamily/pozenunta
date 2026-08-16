@@ -37,7 +37,7 @@ define('THUMB_WIDTH', 600);
 // Câte poze se încarcă odată în galerie (scroll infinit).
 define('PER_PAGINA', 30);
 // Spațiul TOTAL al găzduirii, în GB (pentru indicatorul din panou). Mărește-l dacă cumperi spațiu suplimentar.
-define('DISK_QUOTA_GB', 20);
+define('DISK_QUOTA_GB', 80);
 
 /* ---------- 5. CĂI (nu modifica) ---------- */
 define('UPLOAD_DIR', __DIR__ . '/uploads/');
