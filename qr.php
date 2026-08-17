@@ -16,13 +16,26 @@ asigura_schema();
 
 /* Valorile implicite, dacă nu s-a schimbat nimic încă. */
 $IMPLICITE = [
-    'qr_indemn'   => 'Scanează-mă',
-    'qr_indiciu'  => 'încarcă pozele tale',
-    'qr_nume'     => NUME_MIRE . ' & ' . NUME_MIREASA,
-    'qr_scris'    => 'ScrisParisienne',
-    'qr_sageata'  => '1',
-    'qr_data'     => '1',
-    'qr_adresa'   => '1',
+    'qr_indemn'        => 'Scanează-mă',
+    'qr_indiciu'       => 'împărtășește momentele cu noi',
+    'qr_nume'          => NUME_MIRE . ' & ' . NUME_MIREASA,
+    'qr_scris'         => 'ScrisParisienne',
+    'qr_sageata'       => '1',
+    'qr_sageata_sus'   => '4',        // cât de jos stă săgeata (px): mai mare = mai aproape de cod
+    'qr_data'          => '1',
+    'qr_adresa'        => '1',
+    'qr_inima'         => '0',        // inimioara decorativă, oprită implicit
+    'qr_inima_culoare' => '#BF9B4F',  // auriul mărcii
+];
+
+/* Culorile permise pentru inimioară — o listă scurtă, ca să nu ajungă
+   orice valoare în pagină. */
+$CULORI_INIMA = [
+    '#BF9B4F' => 'auriu',
+    '#0D3328' => 'verde',
+    '#C0432F' => 'roșu',
+    '#D98E9E' => 'roz',
+    '#8A8071' => 'gri cald',
 ];
 
 $notif = null;
@@ -39,9 +52,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         salveaza_setare('qr_nume',    mb_substr(trim((string)($_POST['qr_nume']    ?? '')), 0, 60));
         $scris = (string)($_POST['qr_scris'] ?? '');
         salveaza_setare('qr_scris', in_array($scris, $scrisuriOk, true) ? $scris : $IMPLICITE['qr_scris']);
-        foreach (['qr_sageata', 'qr_data', 'qr_adresa'] as $k) {
+        foreach (['qr_sageata', 'qr_data', 'qr_adresa', 'qr_inima'] as $k) {
             salveaza_setare($k, empty($_POST[$k]) ? '0' : '1');
         }
+        /* Poziția săgeții: o ținem între 0 și 60 px, ca să nu iasă din cartonaș. */
+        $sus = (int)($_POST['qr_sageata_sus'] ?? 4);
+        salveaza_setare('qr_sageata_sus', (string)max(0, min(60, $sus)));
+        /* Culoarea inimii: doar din lista permisă. */
+        $culoare = (string)($_POST['qr_inima_culoare'] ?? '');
+        salveaza_setare('qr_inima_culoare', isset($CULORI_INIMA[$culoare]) ? $culoare : $IMPLICITE['qr_inima_culoare']);
         $notif = ['ok', 'Salvat. Cartonașul arată așa și după ce închizi pagina.'];
     }
 }
@@ -91,7 +110,7 @@ $m = $MARIMI[$scrisActiv] ?? $MARIMI['ScrisParisienne'];
   .c-sus{position:relative;width:100%;padding-right:50px}
   .c-indemn{font-family:var(--scris),cursive;font-size:var(--s-indemn);line-height:1.05;
     color:#0D3328;white-space:nowrap}
-  .c-sageata{position:absolute;top:4px;right:-6px;width:60px;height:66px;color:#BF9B4F}
+  .c-sageata{position:absolute;top:var(--sageata-sus,4px);right:-6px;width:60px;height:66px;color:#BF9B4F;transition:top .15s}
   .c-qr-zona{position:relative;padding:12px;background:#fff;border-radius:8px}
   .c-colt{position:absolute;width:18px;height:18px;border:2.8px solid #0D3328}
   .c-colt.ss{top:-6px;left:-6px;border-right:0;border-bottom:0;border-radius:6px 0 0 0}
@@ -104,6 +123,8 @@ $m = $MARIMI[$scrisActiv] ?? $MARIMI['ScrisParisienne'];
   .c-nume{font-family:var(--scris),cursive;font-size:var(--s-nume);line-height:1.16;
     letter-spacing:var(--ls-nume);color:#0D3328;white-space:nowrap}
   .c-nume .amp{color:#BF9B4F;margin:0 .12em}
+  .c-inima{margin-top:8px;color:var(--inima,#BF9B4F);line-height:0}
+  .c-inima svg{display:inline-block}
   .c-data{font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;color:#8A8071;margin-top:6px}
   .c-adresa{font-size:.71rem;color:#BF9B4F;margin-top:3px}
   [hidden]{display:none !important}
@@ -126,6 +147,12 @@ $m = $MARIMI[$scrisActiv] ?? $MARIMI['ScrisParisienne'];
     text-transform:uppercase;color:var(--muted);font-style:normal;margin-top:5px}
   .comutatoare{display:flex;flex-direction:column;gap:9px}
   .comutator{display:flex;align-items:center;gap:10px;font-size:.92rem;cursor:pointer}
+  .culori{display:flex;gap:12px;flex-wrap:wrap}
+  .culoare-op{cursor:pointer;line-height:0}
+  .culoare-op input{position:absolute;opacity:0;pointer-events:none}
+  .culoare-op span{display:block;width:34px;height:34px;border-radius:50%;
+    border:2px solid transparent;box-shadow:0 0 0 1px rgba(0,0,0,.12) inset}
+  .culoare-op input:checked + span{border-color:#0D3328;box-shadow:0 0 0 2px #fff inset,0 0 0 3px #0D3328}
   /* Stilul general al formularelor întinde orice input pe toată lățimea;
      la bife asta le-ar împinge eticheta pe rândul următor. */
   .reglaje input[type=checkbox],.reglaje input[type=radio]{
@@ -146,7 +173,7 @@ $m = $MARIMI[$scrisActiv] ?? $MARIMI['ScrisParisienne'];
 
   <!-- ============ CARTONAȘUL ============ -->
   <div class="cartonas" id="cartonas"
-       style="--scris:'<?= h($scrisActiv) ?>';--s-indemn:<?= h($m['indemn']) ?>;--s-nume:<?= h($m['nume']) ?>;--ls-nume:<?= h($m['spatiu']) ?>">
+       style="--scris:'<?= h($scrisActiv) ?>';--s-indemn:<?= h($m['indemn']) ?>;--s-nume:<?= h($m['nume']) ?>;--ls-nume:<?= h($m['spatiu']) ?>;--sageata-sus:<?= (int)qr_setare('qr_sageata_sus') ?>px;--inima:<?= h(qr_setare('qr_inima_culoare')) ?>">
     <div class="c-sus">
       <div class="c-indemn" id="p-indemn"><?= h(qr_setare('qr_indemn')) ?></div>
       <svg class="c-sageata" id="p-sageata" viewBox="0 0 120 130" aria-hidden="true"
@@ -167,6 +194,11 @@ $m = $MARIMI[$scrisActiv] ?? $MARIMI['ScrisParisienne'];
     <div class="c-jos">
       <div class="c-indiciu" id="p-indiciu"><?= h(qr_setare('qr_indiciu')) ?></div>
       <div class="c-nume" id="p-nume"></div>
+      <div class="c-inima" id="p-inima" <?= qr_setare('qr_inima') === '1' ? '' : 'hidden' ?>>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 21s-7.5-4.6-10-9.3C.4 8.3 2 5 5.3 5c2 0 3.4 1.2 4.2 2.4C10.3 6.2 11.7 5 13.7 5 17 5 18.6 8.3 17 11.7 14.5 16.4 12 21 12 21z"/>
+        </svg>
+      </div>
       <div class="c-data" id="p-data" <?= qr_setare('qr_data') === '1' ? '' : 'hidden' ?>><?= h(DATA_NUNTII) ?></div>
       <div class="c-adresa" id="p-adresa" <?= qr_setare('qr_adresa') === '1' ? '' : 'hidden' ?>><?= h(preg_replace('#^https?://#', '', rtrim($url, '/'))) ?></div>
     </div>
@@ -228,14 +260,36 @@ $m = $MARIMI[$scrisActiv] ?? $MARIMI['ScrisParisienne'];
         <div class="camp">
           <label>Ce se arată</label>
           <div class="comutatoare">
-            <label class="comutator"><input type="checkbox" name="qr_sageata" value="1"
+            <label class="comutator"><input type="checkbox" name="qr_sageata" value="1" id="c-sageata"
               <?= qr_setare('qr_sageata') === '1' ? 'checked' : '' ?>> Săgeata către cod</label>
             <label class="comutator"><input type="checkbox" name="qr_data" value="1"
               <?= qr_setare('qr_data') === '1' ? 'checked' : '' ?>> Data nunții</label>
             <label class="comutator"><input type="checkbox" name="qr_adresa" value="1"
               <?= qr_setare('qr_adresa') === '1' ? 'checked' : '' ?>> Adresa scrisă sub cod</label>
+            <label class="comutator"><input type="checkbox" name="qr_inima" value="1" id="c-inima"
+              <?= qr_setare('qr_inima') === '1' ? 'checked' : '' ?>> Inimioară sub nume</label>
           </div>
           <div class="mic" style="margin-top:8px">Adresa scrisă ajută invitații care nu reușesc să scaneze.</div>
+        </div>
+
+        <div class="camp" id="camp-sageata" <?= qr_setare('qr_sageata') === '1' ? '' : 'hidden' ?>>
+          <label for="qr_sageata_sus">Cât de aproape e săgeata de cod</label>
+          <input type="range" id="qr_sageata_sus" name="qr_sageata_sus" min="0" max="60" step="2"
+                 value="<?= (int)qr_setare('qr_sageata_sus') ?>" style="width:100%;accent-color:#0D3328">
+          <div class="mic">Trage spre dreapta ca s-o apropii de cod.</div>
+        </div>
+
+        <div class="camp" id="camp-inima" <?= qr_setare('qr_inima') === '1' ? '' : 'hidden' ?>>
+          <label>Culoarea inimioarei</label>
+          <div class="culori">
+            <?php foreach ($CULORI_INIMA as $hex => $nume): ?>
+              <label class="culoare-op" title="<?= h($nume) ?>">
+                <input type="radio" name="qr_inima_culoare" value="<?= h($hex) ?>"
+                       <?= qr_setare('qr_inima_culoare') === $hex ? 'checked' : '' ?>>
+                <span style="background:<?= h($hex) ?>"></span>
+              </label>
+            <?php endforeach; ?>
+          </div>
         </div>
 
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px">
@@ -314,14 +368,39 @@ $m = $MARIMI[$scrisActiv] ?? $MARIMI['ScrisParisienne'];
     });
   });
 
-  [['qr_sageata','p-sageata'], ['qr_data','p-data'], ['qr_adresa','p-adresa']].forEach(function (p) {
+  [['qr_sageata','p-sageata'], ['qr_data','p-data'], ['qr_adresa','p-adresa'], ['qr_inima','p-inima']].forEach(function (p) {
     var c = document.querySelector('input[name="' + p[0] + '"]'), el = document.getElementById(p[1]);
     if (!c || !el) return;
-    /* Punem chiar atributul, nu proprietatea: săgeata e un SVG, iar acolo
-       proprietatea „hidden" nu e sigură pe toate browserele — atributul,
-       de care ține regula din CSS, funcționează peste tot. */
+    /* Punem chiar atributul, nu proprietatea: săgeata și inima sunt SVG,
+       iar acolo proprietatea „hidden" nu e sigură pe toate browserele —
+       atributul, de care ține regula din CSS, funcționează peste tot. */
     c.addEventListener('change', function () {
       if (c.checked) el.removeAttribute('hidden'); else el.setAttribute('hidden', '');
+    });
+  });
+
+  /* Săgeata: cursorul o apropie de cod, iar reglajul lui apare doar când
+     săgeata e pornită. */
+  var slider = document.getElementById('qr_sageata_sus');
+  if (slider) {
+    slider.addEventListener('input', function () {
+      cartonas.style.setProperty('--sageata-sus', slider.value + 'px');
+    });
+  }
+  function aratREglaj(idBifa, idCamp) {
+    var b = document.getElementById(idBifa), camp = document.getElementById(idCamp);
+    if (!b || !camp) return;
+    b.addEventListener('change', function () {
+      if (b.checked) camp.removeAttribute('hidden'); else camp.setAttribute('hidden', '');
+    });
+  }
+  aratREglaj('c-sageata', 'camp-sageata');
+  aratREglaj('c-inima',   'camp-inima');
+
+  /* Culoarea inimii, pe loc. */
+  document.querySelectorAll('input[name="qr_inima_culoare"]').forEach(function (r) {
+    r.addEventListener('change', function () {
+      cartonas.style.setProperty('--inima', r.value);
     });
   });
 })();
