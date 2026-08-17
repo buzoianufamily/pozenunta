@@ -119,12 +119,13 @@ $m = $MARIMI[$scrisActiv] ?? $MARIMI['ScrisParisienne'];
   .c-colt.jd{bottom:-6px;right:-6px;border-left:0;border-top:0;border-radius:0 0 6px 0}
   #qrcode img,#qrcode canvas{display:block}
   .c-jos{width:100%}
-  .c-indiciu{font-size:.66rem;letter-spacing:.22em;text-transform:uppercase;color:#8A8071;margin-bottom:5px}
+  .c-indiciu-rand{display:flex;align-items:center;justify-content:center;gap:6px;
+    flex-wrap:wrap;margin-bottom:5px}
+  .c-indiciu{font-size:.66rem;letter-spacing:.22em;text-transform:uppercase;color:#8A8071}
   .c-nume{font-family:var(--scris),cursive;font-size:var(--s-nume);line-height:1.16;
     letter-spacing:var(--ls-nume);color:#0D3328;white-space:nowrap}
   .c-nume .amp{color:#BF9B4F;margin:0 .12em}
-  .c-inima{margin-top:8px;color:var(--inima,#BF9B4F);line-height:0}
-  .c-inima svg{display:inline-block}
+  .c-inima{color:var(--inima,#BF9B4F);line-height:0;display:inline-flex;align-items:center}
   .c-data{font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;color:#8A8071;margin-top:6px}
   .c-adresa{font-size:.71rem;color:#BF9B4F;margin-top:3px}
   [hidden]{display:none !important}
@@ -192,13 +193,15 @@ $m = $MARIMI[$scrisActiv] ?? $MARIMI['ScrisParisienne'];
     </div>
 
     <div class="c-jos">
-      <div class="c-indiciu" id="p-indiciu"><?= h(qr_setare('qr_indiciu')) ?></div>
-      <div class="c-nume" id="p-nume"></div>
-      <div class="c-inima" id="p-inima" <?= qr_setare('qr_inima') === '1' ? '' : 'hidden' ?>>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M12 21s-7.5-4.6-10-9.3C.4 8.3 2 5 5.3 5c2 0 3.4 1.2 4.2 2.4C10.3 6.2 11.7 5 13.7 5 17 5 18.6 8.3 17 11.7 14.5 16.4 12 21 12 21z"/>
-        </svg>
+      <div class="c-indiciu-rand">
+        <span class="c-indiciu" id="p-indiciu"><?= h(qr_setare('qr_indiciu')) ?></span>
+        <span class="c-inima" id="p-inima" <?= qr_setare('qr_inima') === '1' ? '' : 'hidden' ?>>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 21s-7.5-4.6-10-9.3C.4 8.3 2 5 5.3 5c2 0 3.4 1.2 4.2 2.4C10.3 6.2 11.7 5 13.7 5 17 5 18.6 8.3 17 11.7 14.5 16.4 12 21 12 21z"/>
+          </svg>
+        </span>
       </div>
+      <div class="c-nume" id="p-nume"></div>
       <div class="c-data" id="p-data" <?= qr_setare('qr_data') === '1' ? '' : 'hidden' ?>><?= h(DATA_NUNTII) ?></div>
       <div class="c-adresa" id="p-adresa" <?= qr_setare('qr_adresa') === '1' ? '' : 'hidden' ?>><?= h(preg_replace('#^https?://#', '', rtrim($url, '/'))) ?></div>
     </div>
@@ -267,7 +270,7 @@ $m = $MARIMI[$scrisActiv] ?? $MARIMI['ScrisParisienne'];
             <label class="comutator"><input type="checkbox" name="qr_adresa" value="1"
               <?= qr_setare('qr_adresa') === '1' ? 'checked' : '' ?>> Adresa scrisă sub cod</label>
             <label class="comutator"><input type="checkbox" name="qr_inima" value="1" id="c-inima"
-              <?= qr_setare('qr_inima') === '1' ? 'checked' : '' ?>> Inimioară sub nume</label>
+              <?= qr_setare('qr_inima') === '1' ? 'checked' : '' ?>> Inimioară lângă text</label>
           </div>
           <div class="mic" style="margin-top:8px">Adresa scrisă ajută invitații care nu reușesc să scaneze.</div>
         </div>
