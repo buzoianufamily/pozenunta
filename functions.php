@@ -301,9 +301,16 @@ function converteste_heic(string $cale): ?string {
 
 /* URL-ul de afișat în galerie pentru o poză:
    miniatura dacă există, altfel originalul.                      */
+/* Are fișierul o miniatură adevărată pe disc?
+   La filme se face din cadrul trimis de telefon; dacă telefonul nu a
+   reușit să-l scoată, miniatura lipsește — iar atunci galeria trebuie
+   să arate filmul însuși, nu să încerce să-l pună într-o imagine. */
+function are_miniatura(array $poza): bool {
+    return is_file(THUMB_DIR . $poza['nume_fisier'] . '.jpg');
+}
+
 function url_previzualizare(array $poza): string {
-    $thumb = THUMB_DIR . $poza['nume_fisier'] . '.jpg';
-    if (is_file($thumb)) {
+    if (are_miniatura($poza)) {
         return THUMB_URL . rawurlencode($poza['nume_fisier']) . '.jpg';
     }
     return UPLOAD_URL . rawurlencode($poza['nume_fisier']);
@@ -334,6 +341,7 @@ function poza_pentru_json(array $p): array {
         'aprecieri' => (int)($p['aprecieri'] ?? 0),
         'data'      => date('d.m.Y H:i', strtotime($p['data_incarcare'])),
         'alMeu'     => $alMeu,
+        'miniatura' => are_miniatura($p),
     ];
 }
 

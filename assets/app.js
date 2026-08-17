@@ -29,6 +29,20 @@
   function salveazaLike(set) { try { localStorage.setItem(CHEIE_LIKE, JSON.stringify(Array.from(set))); } catch (e) {} }
   function esteApreciat(id) { return likeSet().has(id); }
 
+  /* Ce se arată în galerie pentru un fișier.
+     Filmele au de obicei o miniatură făcută din cadrul trimis de telefon.
+     Când telefonul nu a reușit să-l scoată, miniatura lipsește — și
+     atunci nu are rost să încercăm filmul într-o etichetă de imagine,
+     pentru că nu se afișează nimic. Punem chiar filmul, cerut doar cât
+     să se vadă primul cadru: „#t=0.1" îi spune browserului de unde. */
+  function previzualizare(p, textAlternativ) {
+    if (p.tip === 'video' && p.miniatura === false) {
+      return '<video class="mini-video" src="' + esc(p.original) + '#t=0.1"'
+           + ' preload="metadata" muted playsinline tabindex="-1"></video>';
+    }
+    return '<img loading="lazy" src="' + esc(p.preview) + '" alt="' + textAlternativ + '">';
+  }
+
   /* Serverul e sursa de adevăr: ține aprecierile pe invitat, nu pe
      telefon. Sincronizăm memoria locală cu ce spune el, ca inimile să
      arate corect și de pe alt dispozitiv. */
@@ -591,7 +605,7 @@
       poze.forEach(function (p) {
         var idx = toate.length; toate.push(p);
         var div = document.createElement('div'); div.className = 'poza'; div.setAttribute('data-idx', idx); div.setAttribute('data-id', p.id);
-        var inner = '<img loading="lazy" src="' + esc(p.preview) + '" alt="' + esc(p.nume || 'Fotografie de nuntă') + '">';
+        var inner = previzualizare(p, esc(p.nume || 'Fotografie de nuntă'));
         if (p.tip === 'video') inner += '<div class="play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>';
         inner += '<button class="inima' + (esteApreciat(p.id) ? ' activ' : '') + '" data-like="' + p.id + '" aria-label="Apreciază">' + inimaSVG() + '<span>' + p.aprecieri + '</span></button>';
         if (p.nume || p.mesaj) inner += '<div class="pe-poza">' + (p.nume ? '<div class="nume">' + esc(p.nume) + '</div>' : '') + (p.mesaj ? '<div class="ms">' + esc(p.mesaj.length > 90 ? p.mesaj.slice(0, 90) + '…' : p.mesaj) + '</div>' : '') + '</div>';
@@ -786,7 +800,7 @@
       var poze = d.poze.slice(0, 16);
       function el(p) {
         var a = document.createElement('a'); a.className = 'banda-item'; a.href = 'galerie.php';
-        a.innerHTML = '<img loading="lazy" src="' + esc(p.preview) + '" alt="">' + (p.tip === 'video' ? '<span class="banda-play"><svg viewBox="0 0 24 24" fill="currentColor" width="26" height="26"><path d="M8 5v14l11-7z"/></svg></span>' : '');
+        a.innerHTML = previzualizare(p, '') + (p.tip === 'video' ? '<span class="banda-play"><svg viewBox="0 0 24 24" fill="currentColor" width="26" height="26"><path d="M8 5v14l11-7z"/></svg></span>' : '');
         return a;
       }
       poze.forEach(function (p) { bandaTrack.appendChild(el(p)); });
