@@ -98,7 +98,13 @@ cap_pagina('Acasă', 'acasa');
     <div class="galerie">
       <?php foreach ($pozeRecente as $p): ?>
         <a class="poza vizibil" href="galerie" aria-label="Vezi galeria">
-          <img loading="lazy" src="<?= h(url_previzualizare($p)) ?>" alt="">
+          <?php if ($p['tip'] === 'video' && !are_miniatura($p)): ?>
+            <?php /* Fără cadrul trimis de telefon nu există miniatură; arătăm
+                     chiar filmul, cerut doar cât să se vadă primul cadru. */ ?>
+            <video src="<?= h(url_original($p)) ?>#t=0.1" preload="metadata" muted playsinline tabindex="-1"></video>
+          <?php else: ?>
+            <img loading="lazy" src="<?= h(url_previzualizare($p)) ?>" alt="">
+          <?php endif; ?>
           <?php if ($p['tip'] === 'video'): ?><div class="play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div><?php endif; ?>
         </a>
       <?php endforeach; ?>
