@@ -22,6 +22,7 @@ $IMPLICITE = [
     'qr_scris'         => 'ScrisParisienne',
     'qr_sageata'       => '1',
     'qr_sageata_sus'   => '4',        // cât de jos stă săgeata (px): mai mare = mai aproape de cod
+    'qr_sageata_lung'  => '66',       // lungimea săgeții (px): mai mare = mai alungită în jos
     'qr_data'          => '1',
     'qr_adresa'        => '1',
     'qr_inima'         => '0',        // inimioara decorativă, oprită implicit
@@ -58,6 +59,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         /* Poziția săgeții: o ținem între 0 și 60 px, ca să nu iasă din cartonaș. */
         $sus = (int)($_POST['qr_sageata_sus'] ?? 4);
         salveaza_setare('qr_sageata_sus', (string)max(0, min(60, $sus)));
+        /* Lungimea săgeții: între 50 și 200 px. */
+        $lung = (int)($_POST['qr_sageata_lung'] ?? 66);
+        salveaza_setare('qr_sageata_lung', (string)max(50, min(200, $lung)));
         /* Culoarea inimii: doar din lista permisă. */
         $culoare = (string)($_POST['qr_inima_culoare'] ?? '');
         salveaza_setare('qr_inima_culoare', isset($CULORI_INIMA[$culoare]) ? $culoare : $IMPLICITE['qr_inima_culoare']);
@@ -110,7 +114,8 @@ $m = $MARIMI[$scrisActiv] ?? $MARIMI['ScrisParisienne'];
   .c-sus{position:relative;width:100%;padding-right:50px}
   .c-indemn{font-family:var(--scris),cursive;font-size:var(--s-indemn);line-height:1.05;
     color:#0D3328;white-space:nowrap}
-  .c-sageata{position:absolute;top:var(--sageata-sus,4px);right:-6px;width:60px;height:66px;color:#BF9B4F;transition:top .15s}
+  .c-sageata{position:absolute;top:var(--sageata-sus,4px);right:-6px;width:60px;
+    height:var(--sageata-h,66px);color:#BF9B4F;transition:top .15s,height .15s}
   .c-qr-zona{position:relative;padding:12px;background:#fff;border-radius:8px}
   .c-colt{position:absolute;width:18px;height:18px;border:2.8px solid #0D3328}
   .c-colt.ss{top:-6px;left:-6px;border-right:0;border-bottom:0;border-radius:6px 0 0 0}
@@ -174,15 +179,21 @@ $m = $MARIMI[$scrisActiv] ?? $MARIMI['ScrisParisienne'];
 
   <!-- ============ CARTONAȘUL ============ -->
   <div class="cartonas" id="cartonas"
-       style="--scris:'<?= h($scrisActiv) ?>';--s-indemn:<?= h($m['indemn']) ?>;--s-nume:<?= h($m['nume']) ?>;--ls-nume:<?= h($m['spatiu']) ?>;--sageata-sus:<?= (int)qr_setare('qr_sageata_sus') ?>px;--inima:<?= h(qr_setare('qr_inima_culoare')) ?>">
+       style="--scris:'<?= h($scrisActiv) ?>';--s-indemn:<?= h($m['indemn']) ?>;--s-nume:<?= h($m['nume']) ?>;--ls-nume:<?= h($m['spatiu']) ?>;--sageata-sus:<?= (int)qr_setare('qr_sageata_sus') ?>px;--sageata-h:<?= (int)qr_setare('qr_sageata_lung') ?>px;--inima:<?= h(qr_setare('qr_inima_culoare')) ?>">
     <div class="c-sus">
       <div class="c-indemn" id="p-indemn"><?= h(qr_setare('qr_indemn')) ?></div>
       <svg class="c-sageata" id="p-sageata" viewBox="0 0 120 130" aria-hidden="true"
+           preserveAspectRatio="none"
            <?= qr_setare('qr_sageata') === '1' ? '' : 'hidden' ?>>
+        <?php /* preserveAspectRatio="none" lasă săgeata să se întindă pe
+                 înălțime când o lungim; vector-effect ține linia la aceeași
+                 grosime, ca să nu se subțieze la întindere. */ ?>
         <path d="M14 14 C 70 -4, 118 22, 104 62 C 95 90, 68 108, 40 112"
-              fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
+              fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"
+              vector-effect="non-scaling-stroke"/>
         <path d="M58 100 L 37 113 L 53 126" fill="none" stroke="currentColor"
-              stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+              stroke-width="5" stroke-linecap="round" stroke-linejoin="round"
+              vector-effect="non-scaling-stroke"/>
       </svg>
     </div>
 
@@ -280,6 +291,11 @@ $m = $MARIMI[$scrisActiv] ?? $MARIMI['ScrisParisienne'];
           <input type="range" id="qr_sageata_sus" name="qr_sageata_sus" min="0" max="60" step="2"
                  value="<?= (int)qr_setare('qr_sageata_sus') ?>" style="width:100%;accent-color:#0D3328">
           <div class="mic">Trage spre dreapta ca s-o apropii de cod.</div>
+
+          <label for="qr_sageata_lung" style="margin-top:14px">Lungimea săgeții</label>
+          <input type="range" id="qr_sageata_lung" name="qr_sageata_lung" min="50" max="200" step="4"
+                 value="<?= (int)qr_setare('qr_sageata_lung') ?>" style="width:100%;accent-color:#0D3328">
+          <div class="mic">Trage spre dreapta ca s-o alungești în jos, mai puțin rotunjită.</div>
         </div>
 
         <div class="camp" id="camp-inima" <?= qr_setare('qr_inima') === '1' ? '' : 'hidden' ?>>
@@ -388,6 +404,12 @@ $m = $MARIMI[$scrisActiv] ?? $MARIMI['ScrisParisienne'];
   if (slider) {
     slider.addEventListener('input', function () {
       cartonas.style.setProperty('--sageata-sus', slider.value + 'px');
+    });
+  }
+  var sliderL = document.getElementById('qr_sageata_lung');
+  if (sliderL) {
+    sliderL.addEventListener('input', function () {
+      cartonas.style.setProperty('--sageata-h', sliderL.value + 'px');
     });
   }
   function aratREglaj(idBifa, idCamp) {
