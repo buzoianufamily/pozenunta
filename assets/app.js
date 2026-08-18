@@ -683,6 +683,21 @@
       return (baza || 'nunta') + '-' + p.id + '.' + ext;
     }
 
+    /* Aducem din timp poza următoare și pe cea dinainte. Invitatul
+       răsfoiește repede, iar fără asta fiecare pas așteaptă rețeaua de la
+       zero. Browserul le ține în memoria lui, deci când ajunge la ele
+       sunt deja acolo. Doar imagini: un film adus din timp ar trage zeci
+       de MB pe care poate nu le deschide nimeni. */
+    function preincarcaVecinii(i) {
+      [i + 1, i - 1].forEach(function (k) {
+        var v = toate[k];
+        if (!v || v.tip === 'video') return;
+        var im = new Image();
+        im.decoding = 'async';
+        im.src = v.original;
+      });
+    }
+
     function randeaza(i) {
       var p = toate[i]; if (!p) return; idxCurent = i; lbIdActual = p.id;
       lbCont.innerHTML = p.tip === 'video'
@@ -697,6 +712,7 @@
       lbDl.setAttribute('download', numeDescarcare(p));
       lbLikeN.textContent = p.aprecieri; lbLike.classList.toggle('activ', esteApreciat(p.id));
       if (lbSterge) lbSterge.hidden = !p.alMeu;
+      preincarcaVecinii(i);
     }
 
     /* Ștergerea propriului fișier. Serverul verifică din nou dreptul —
@@ -762,6 +778,37 @@
     lbLike.addEventListener('click', function (e) { e.stopPropagation(); if (lbIdActual != null) comutaLike(lbIdActual); });
     if (lbSterge) lbSterge.addEventListener('click', function (e) { e.stopPropagation(); if (lbIdActual != null) stergeAlMeu(lbIdActual); });
     lb.addEventListener('click', function (e) { if (e.target === lb || e.target === lbCont) inchide(); });
+
+    /* ---- răsfoire cu degetul ----
+       Aproape toți invitații sunt pe telefon, iar pe telefon gestul de a
+       trece la poza următoare e trasul cu degetul, nu căutarea unei
+       săgeți mici. Săgețile rămân, pentru cine e pe calculator.
+
+       Nu prindem gestul început pe film (acolo degetul e pe bara de
+       derulare) și nici pe butoane. Cerem o mișcare clar orizontală, ca
+       să nu schimbăm poza când cineva doar trage pagina în jos. */
+    var atX = 0, atY = 0, atT = 0, atActiv = false;
+    var PRAG_SWIPE = 45;      // cât trebuie să meargă degetul, în puncte
+    var PRAG_TIMP  = 800;     // peste atât nu mai e o trecere, e o apăsare lungă
+
+    lb.addEventListener('touchstart', function (e) {
+      if (e.touches.length !== 1) { atActiv = false; return; }
+      if (e.target.closest('video, button, a')) { atActiv = false; return; }
+      atX = e.touches[0].clientX; atY = e.touches[0].clientY;
+      atT = Date.now(); atActiv = true;
+    }, { passive: true });
+
+    lb.addEventListener('touchend', function (e) {
+      if (!atActiv) return;
+      atActiv = false;
+      var t = e.changedTouches && e.changedTouches[0];
+      if (!t) return;
+      var dx = t.clientX - atX, dy = t.clientY - atY;
+      if (Date.now() - atT > PRAG_TIMP) return;
+      if (Math.abs(dx) < PRAG_SWIPE) return;
+      if (Math.abs(dx) < Math.abs(dy) * 1.5) return;   // mai mult vertical: e derulare
+      navig(dx < 0 ? 1 : -1);
+    }, { passive: true });
     document.addEventListener('keydown', function (e) {
       if (!lb.classList.contains('deschis')) return;
 
@@ -788,25 +835,7 @@
     });
   }
 
-  /* ============================================================
-     3) BANDA cu cele mai noi poze (pagina de start)
-     ============================================================ */
-  var bandaTrack = document.getElementById('banda-track');
-  if (bandaTrack) initBanda();
-
-  function initBanda() {
-    fetch('api.php?actiune=lista&sortare=noi&pagina=1').then(function (r) { return r.json(); }).then(function (d) {
-      if (!d || !d.ok || !d.poze.length) return;
-      var poze = d.poze.slice(0, 16);
-      function el(p) {
-        var a = document.createElement('a'); a.className = 'banda-item'; a.href = 'galerie.php';
-        a.innerHTML = previzualizare(p, '') + (p.tip === 'video' ? '<span class="banda-play"><svg viewBox="0 0 24 24" fill="currentColor" width="26" height="26"><path d="M8 5v14l11-7z"/></svg></span>' : '');
-        return a;
-      }
-      poze.forEach(function (p) { bandaTrack.appendChild(el(p)); });
-      poze.forEach(function (p) { bandaTrack.appendChild(el(p)); }); // a doua copie pentru buclă lină
-      bandaTrack.style.animationDuration = Math.max(18, poze.length * 2.4) + 's';
-      document.getElementById('banda-sectiune').style.display = 'block';
-    }).catch(function () {});
-  }
+  /* Banda rulantă de pe prima pagină a fost scoasă: pozele recente se
+     arată acum direct din PHP, fără încă o cerere la server. Codul ei nu
+     mai avea de ce să se încarce pe telefonul fiecărui invitat. */
 })();

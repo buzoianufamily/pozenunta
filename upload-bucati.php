@@ -175,8 +175,9 @@ if ($actiune === 'bucata') {
     fclose($fp);
 
     if ($scrisi === false || $scrisi < $dimBucata) {
-        /* Scriere parțială (disc plin?) — tăiem la loc la dimensiunea bună. */
-        @file_put_contents($cale, '', LOCK_EX | FILE_APPEND);
+        /* Scriere parțială — de obicei disc plin. Ce a apucat să intre e
+           bun și e lipit corect, deci nu tăiem nimic: îi spunem clientului
+           cât avem cu adevărat, iar el reia exact de acolo. */
         clearstatcache(true, $cale);
         raspunde(['ok' => false, 'eroare' => 'Spațiu insuficient pe server.', 'primit' => octeti_primiti($id)], 507);
     }
