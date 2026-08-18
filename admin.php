@@ -58,6 +58,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             salveaza_setare('moderare', moderare_activa() ? '0' : '1');
             $notif = ['ok', 'Setare salvată.'];
 
+        } elseif ($actiune === 'salveaza_texte') {
+            /* Salvăm doar cheile pe care le cunoaștem, ca să nu ajungă
+               orice câmp trimis din afară în setări. */
+            $n = 0;
+            foreach (texte_editabile() as $cheie => $def) {
+                if (!array_key_exists($cheie, $_POST)) continue;
+                salveaza_setare($cheie, mb_substr(trim((string)$_POST[$cheie]), 0, 600));
+                $n++;
+            }
+            $notif = ['ok', "Textele au fost actualizate ($n)."];
+
+        } elseif ($actiune === 'texte_implicite') {
+            foreach (texte_editabile() as $cheie => $def) salveaza_setare($cheie, $def[2]);
+            $notif = ['ok', 'Textele au revenit la varianta de pornire.'];
+
         } elseif ($actiune === 'salveaza_mesaj') {
             salveaza_setare('mesaj_bun_venit', trim((string)($_POST['mesaj'] ?? '')));
             $notif = ['ok', 'Mesajul de bun venit a fost actualizat.'];
@@ -257,6 +272,55 @@ $poze = $stmt->fetchAll();
         <a class="btn btn-ghost btn-mic" href="qr.php" target="_blank">Cod QR pentru invitați</a>
         <a class="btn btn-dark btn-mic" href="descarca-zip.php">Descarcă tot (ZIP)</a>
       </div>
+    </div>
+
+    <!-- TEXTELE DE PE PAGINI -->
+    <div class="panou">
+      <h2>Textele de pe pagini</h2>
+      <p class="ajutor">
+        Tot ce citește invitatul, în afară de mesajul de bun venit (care are câmpul lui mai sus).
+        Lasă un câmp gol ca să revină la textul de pornire.
+      </p>
+
+      <form method="post">
+        <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
+        <input type="hidden" name="actiune" value="salveaza_texte">
+
+        <?php
+        /* Grupăm după pagină, ca să se găsească ușor. */
+        $peGrupe = [];
+        foreach (texte_editabile() as $cheie => $def) {
+            [$grup, $eticheta, $implicit, $lung] = $def;
+            $peGrupe[$grup][$cheie] = [$eticheta, $implicit, $lung];
+        }
+        foreach ($peGrupe as $grup => $campuri): ?>
+          <h3 style="font-family:var(--serif);font-weight:500;font-size:1.1rem;color:var(--green);
+                     margin:22px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line-soft)">
+            <?= h($grup) ?>
+          </h3>
+          <?php foreach ($campuri as $cheie => [$eticheta, $implicit, $lung]): ?>
+            <div class="camp" style="margin-bottom:14px">
+              <label for="<?= h($cheie) ?>"><?= h($eticheta) ?></label>
+              <?php if ($lung): ?>
+                <textarea id="<?= h($cheie) ?>" name="<?= h($cheie) ?>" rows="2"><?= h(text($cheie)) ?></textarea>
+              <?php else: ?>
+                <input type="text" id="<?= h($cheie) ?>" name="<?= h($cheie) ?>" maxlength="600" value="<?= h(text($cheie)) ?>">
+              <?php endif; ?>
+            </div>
+          <?php endforeach; ?>
+        <?php endforeach; ?>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px">
+          <button class="btn btn-primar btn-mic" type="submit">Salvează textele</button>
+        </div>
+      </form>
+
+      <form method="post" style="margin-top:12px"
+            onsubmit="return confirm('Toate textele revin la varianta de pornire. Continui?')">
+        <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
+        <input type="hidden" name="actiune" value="texte_implicite">
+        <button class="btn btn-ghost btn-mic" type="submit">Revino la textele de pornire</button>
+      </form>
     </div>
 
     <!-- CARTE DE URĂRI -->
