@@ -202,6 +202,19 @@ $poze = $stmt->fetchAll();
       <div class="alerta <?= $notif[0]==='ok'?'ok':'' ?>" style="margin-bottom:22px"><?= h($notif[1]) ?></div>
     <?php endif; ?>
 
+    <?php /* Dacă folderul de miniaturi lipsește sau nu se poate scrie în el,
+             galeria trimite mai departe originalele — merge, dar de vreo
+             douăzeci de ori mai greu, fără niciun semn. Aici se vede. */ ?>
+    <?php if (!asigura_folder_miniaturi()): ?>
+      <div class="alerta" style="margin-bottom:22px">
+        <strong>Miniaturile nu se pot salva.</strong> Folderul
+        <code>uploads/thumbs</code> lipsește sau nu are drept de scriere.
+        Galeria funcționează, dar trimite pozele la mărimea lor întreagă și
+        se încarcă mult mai greu. Creează folderul din File Manager și
+        pune-i drepturile 755.
+      </div>
+    <?php endif; ?>
+
     <!-- STATISTICI -->
     <div class="statistici">
       <div class="stat"><div class="nr"><?= $total ?></div><div class="et">Fotografii & filme</div></div>

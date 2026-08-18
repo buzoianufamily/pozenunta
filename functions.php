@@ -256,7 +256,19 @@ function thumbnail_imagick(string $sursa, string $destinatie, int $latimeMax): b
     } catch (Throwable $e) { return false; }
 }
 
+/* Fără folderul de miniaturi, GD și Imagick nu au unde scrie și dau greș
+   în tăcere — iar galeria începe să trimită originalele: 1,2 MB în loc de
+   55 KB de fiecare poză, fără ca nimeni să vadă că s-a stricat ceva.
+   Îl facem dacă lipsește, ca o mutare greșită din File Manager sau o
+   copiere care sare folderele goale să nu coste toată seara. */
+function asigura_folder_miniaturi(): bool {
+    if (is_dir(THUMB_DIR)) return is_writable(THUMB_DIR);
+    if (!@mkdir(THUMB_DIR, 0755, true) && !is_dir(THUMB_DIR)) return false;
+    return is_writable(THUMB_DIR);
+}
+
 function creeaza_thumbnail(string $sursa, string $destinatie, int $latimeMax = THUMB_WIDTH): bool {
+    if (strpos($destinatie, THUMB_DIR) === 0) asigura_folder_miniaturi();
     if (thumbnail_gd($sursa, $destinatie, $latimeMax)) return true;
     return thumbnail_imagick($sursa, $destinatie, $latimeMax);
 }
