@@ -81,6 +81,52 @@ function salveaza_setare(string $cheie, string $valoare): void {
     if (is_array($c)) { $c[$cheie] = $valoare; }
 }
 
+/* ============================================================
+   TEXTELE DE PE PAGINI, schimbabile din panou
+   ------------------------------------------------------------
+   Toate stau într-un singur loc: cheia, unde apare, cum se
+   numește în panou și ce scrie dacă nu s-a schimbat nimic.
+   Ca să adaugi un text nou, îl pui aici și îl chemi cu text().
+   ============================================================ */
+function texte_editabile(): array {
+    return [
+        /* ---------- prima pagină ---------- */
+        'tx_acasa_eyebrow'   => ['Prima pagină', 'Rândul mic de deasupra numelor', 'Albumul nostru de nuntă', false],
+        'tx_incarca_titlu'   => ['Prima pagină', 'Titlul secțiunii de încărcare', 'Împărtășește momentele', false],
+        'tx_incarca_desc'    => ['Prima pagină', 'Textul de sub titlu', 'Ai surprins un moment frumos? Încarcă-l aici — pozele și filmele tale ajung direct în albumul nostru. Nu e nevoie de cont.', true],
+        'tx_drop_titlu'      => ['Prima pagină', 'Textul mare din chenarul de încărcare', 'Încarcă pozele și videoclipurile aici', false],
+        'tx_drop_desc'       => ['Prima pagină', 'Textul mic din chenar', 'Poți selecta oricâte deodată, direct de pe telefon', false],
+        'tx_nume_eticheta'   => ['Prima pagină', 'Eticheta câmpului cu numele', 'Numele tău', false],
+        'tx_nume_ajutor'     => ['Prima pagină', 'Îndemnul de sub câmpul cu numele', 'Scrie-ți numele ca să știm ale cui sunt pozele — opțional, dar ne-ar bucura mult 🤍', true],
+        'tx_buton_incarca'   => ['Prima pagină', 'Textul butonului de încărcare', 'Încarcă în album', false],
+        'tx_succes_titlu'    => ['Prima pagină', 'Titlul de mulțumire, după încărcare', 'Mulțumim din suflet!', false],
+        'tx_recente_titlu'   => ['Prima pagină', 'Titlul secțiunii cu poze recente', 'Cele mai noi momente', false],
+        'tx_urari_titlu'     => ['Prima pagină', 'Titlul secțiunii cu urări', 'Urări de la invitați', false],
+
+        /* ---------- galerie ---------- */
+        'tx_gal_eyebrow'     => ['Galerie', 'Rândul mic de deasupra titlului', 'Amintirile noastre', false],
+        'tx_gal_titlu'       => ['Galerie', 'Titlul paginii', 'Galeria nunții', false],
+        'tx_gal_gol'         => ['Galerie', 'Ce scrie când albumul e gol', 'Albumul așteaptă primele voastre fotografii.', true],
+
+        /* ---------- carte de urări ---------- */
+        'tx_ur_eyebrow'      => ['Carte de urări', 'Rândul mic de deasupra titlului', 'Gândurile voastre', false],
+        'tx_ur_titlu'        => ['Carte de urări', 'Titlul paginii', 'Carte de urări', false],
+        'tx_ur_nume'         => ['Carte de urări', 'Eticheta câmpului cu numele', 'Numele tău', false],
+        'tx_ur_mesaj'        => ['Carte de urări', 'Eticheta câmpului cu urarea', 'Urarea ta', false],
+        'tx_ur_buton'        => ['Carte de urări', 'Textul butonului', 'Trimite urarea', false],
+        'tx_ur_multumim'     => ['Carte de urări', 'Mulțumirea de după trimitere', 'Îți mulțumim din suflet pentru urare! 🤍', true],
+        'tx_ur_gol'          => ['Carte de urări', 'Ce scrie când nu există urări', 'Fii primul care lasă o urare frumoasă pentru miri.', true],
+    ];
+}
+
+/* Textul de afișat: cel schimbat din panou, altfel cel de pornire. */
+function text(string $cheie): string {
+    $toate = texte_editabile();
+    $implicit = $toate[$cheie][2] ?? '';
+    $v = setare($cheie, null);
+    return ($v === null || $v === '') ? $implicit : (string)$v;
+}
+
 function moderare_activa(): bool {
     return setare('moderare', '0') === '1';
 }

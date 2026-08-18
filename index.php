@@ -14,7 +14,7 @@ cap_pagina('Acasă', 'acasa');
   <div class="watermark" aria-hidden="true"><?= mb_substr(NUME_MIRE,0,1) ?>&amp;<?= mb_substr(NUME_MIREASA,0,1) ?></div>
   <div class="container narrow hero-inner">
     <div class="ornament fade-up d1"><span class="ln"></span><span class="dot"></span><span class="ln r"></span></div>
-    <p class="eyebrow fade-up d1" style="margin-top:14px">Albumul nostru de nuntă</p>
+    <p class="eyebrow fade-up d1" style="margin-top:14px"><?= h(text('tx_acasa_eyebrow')) ?></p>
     <h1 class="fade-up d2"><?= h(NUME_MIRE) ?> <span class="amp">&amp;</span> <?= h(NUME_MIREASA) ?></h1>
     <div class="sub-date fade-up d2"><?= h(DATA_NUNTII) ?></div>
     <?php if (are_cover()): ?>
@@ -23,12 +23,19 @@ cap_pagina('Acasă', 'acasa');
   </div>
 </section>
 
+<div class="container narrow">
+  <div class="card mesaj-miri fade-up d3">
+    <div class="text"><?= h(mesaj_bun_venit()) ?></div>
+    <div class="semnatura"><?= h(NUME_MIRE) ?> &amp; <?= h(NUME_MIREASA) ?></div>
+  </div>
+</div>
+
 <section class="sectiune">
   <div class="container">
     <div class="sectiune-titlu fade-up">
       <div class="ornament"><span class="ln"></span><span class="dot"></span><span class="ln r"></span></div>
-      <h2>Împărtășește momentele</h2>
-      <p>Ai surprins un moment frumos? Încarcă-l aici — pozele și filmele tale ajung direct în albumul nostru. Nu e nevoie de cont.</p>
+      <h2><?= h(text('tx_incarca_titlu')) ?></h2>
+      <p><?= h(text('tx_incarca_desc')) ?></p>
     </div>
 
     <div class="upload-wrap fade-up">
@@ -40,17 +47,17 @@ cap_pagina('Acasă', 'acasa');
               <path d="M4 14v3.5A2.5 2.5 0 0 0 6.5 20h11a2.5 2.5 0 0 0 2.5-2.5V14"/>
             </svg>
           </div>
-          <div class="titlu">Încarcă pozele și videoclipurile aici</div>
-          <div class="desc">Poți selecta oricâte deodată, direct de pe telefon</div>
+          <div class="titlu"><?= h(text('tx_drop_titlu')) ?></div>
+          <div class="desc"><?= h(text('tx_drop_desc')) ?></div>
           <div class="formate">JPG · PNG · HEIC · GIF · MP4 · MOV</div>
         </div>
         <input type="file" id="input-fisiere" accept="image/*,video/*" multiple hidden>
 
         <div class="campuri">
           <div class="camp">
-            <label for="nume">Numele tău</label>
+            <label for="nume"><?= h(text('tx_nume_eticheta')) ?></label>
             <input type="text" id="nume" maxlength="120" placeholder="ex: Familia Popescu">
-            <div class="ajutor-camp">Scrie-ți numele ca să știm ale cui sunt pozele — opțional, dar ne-ar bucura mult 🤍</div>
+            <div class="ajutor-camp"><?= h(text('tx_nume_ajutor')) ?></div>
           </div>
         </div>
         <?php /* Câmpul de mesaj a fost scos anume: există Cartea de urări,
@@ -61,7 +68,7 @@ cap_pagina('Acasă', 'acasa');
         <div class="lista-fisiere" id="lista-fisiere"></div>
 
         <div style="margin-top:18px;text-align:center">
-          <button class="btn btn-primar btn-full" id="btn-incarca" disabled>Încarcă în album</button>
+          <button class="btn btn-primar btn-full" id="btn-incarca" disabled><?= h(text('tx_buton_incarca')) ?></button>
         </div>
       </div>
 
@@ -69,7 +76,7 @@ cap_pagina('Acasă', 'acasa');
         <div class="check" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="34" height="34"><path d="M20 6L9 17l-5-5"/></svg>
         </div>
-        <h3>Mulțumim din suflet!</h3>
+        <h3><?= h(text('tx_succes_titlu')) ?></h3>
         <p id="succes-text">Pozele tale au fost adăugate în album.</p>
         <div style="margin-top:18px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
           <a class="btn btn-primar" href="galerie">Vezi galeria</a>
@@ -81,19 +88,13 @@ cap_pagina('Acasă', 'acasa');
 </section>
 
 
-<div class="container narrow">
-  <div class="card mesaj-miri fade-up d3">
-    <div class="text"><?= h(mesaj_bun_venit()) ?></div>
-    <div class="semnatura"><?= h(NUME_MIRE) ?> &amp; <?= h(NUME_MIREASA) ?></div>
-  </div>
-</div>
 
 <?php if ($pozeRecente): ?>
 <section class="sectiune" style="padding:34px 0 6px">
   <div class="container">
     <div class="sectiune-titlu" style="margin-bottom:18px">
       <div class="ornament"><span class="ln"></span><span class="dot"></span><span class="ln r"></span></div>
-      <h2 style="font-size:clamp(1.7rem,4vw,2.3rem)">Cele mai noi momente</h2>
+      <h2 style="font-size:clamp(1.7rem,4vw,2.3rem)"><?= h(text('tx_recente_titlu')) ?></h2>
     </div>
     <div class="galerie">
       <?php foreach ($pozeRecente as $p): ?>
@@ -119,7 +120,7 @@ cap_pagina('Acasă', 'acasa');
   <div class="container">
     <div class="sectiune-titlu" style="margin-bottom:18px">
       <div class="ornament"><span class="ln"></span><span class="dot"></span><span class="ln r"></span></div>
-      <h2 style="font-size:clamp(1.7rem,4vw,2.3rem)">Urări de la invitați</h2>
+      <h2 style="font-size:clamp(1.7rem,4vw,2.3rem)"><?= h(text('tx_urari_titlu')) ?></h2>
     </div>
     <div class="urari-grid">
       <?php foreach ($urariRecente as $u): ?>

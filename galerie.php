@@ -9,8 +9,8 @@ cap_pagina('Galerie', 'galerie');
 <section class="hero" style="padding:54px 0 18px">
   <div class="container narrow hero-inner">
     <div class="ornament fade-up d1"><span class="ln"></span><span class="dot"></span><span class="ln r"></span></div>
-    <p class="eyebrow fade-up d1" style="margin-top:14px">Amintirile noastre</p>
-    <h1 class="fade-up d2" style="font-size:clamp(2.4rem,6vw,4rem)">Galeria nunții</h1>
+    <p class="eyebrow fade-up d1" style="margin-top:14px"><?= h(text('tx_gal_eyebrow')) ?></p>
+    <h1 class="fade-up d2" style="font-size:clamp(2.4rem,6vw,4rem)"><?= h(text('tx_gal_titlu')) ?></h1>
     <div class="sub-date fade-up d2" id="numar-poze"><?= $total ?> momente surprinse de voi</div>
   </div>
 </section>
@@ -26,7 +26,7 @@ cap_pagina('Galerie', 'galerie');
     <div class="incarcare-mini" id="incarcare-mini">Se încarcă…</div>
     <div class="sentinela" id="sentinela"></div>
     <div class="gol" id="gol" style="display:none">
-      Albumul așteaptă primele voastre fotografii. <br>
+      <?= h(text('tx_gal_gol')) ?> <br>
       <a class="btn btn-primar" style="margin-top:18px" href="/">Încarcă o poză sau video</a>
     </div>
   </div>

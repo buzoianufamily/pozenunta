@@ -79,15 +79,15 @@ cap_pagina('Carte de urări', 'urari');
 <section class="hero" style="padding:54px 0 18px">
   <div class="container narrow hero-inner">
     <div class="ornament fade-up d1"><span class="ln"></span><span class="dot"></span><span class="ln r"></span></div>
-    <p class="eyebrow fade-up d1" style="margin-top:14px">Gândurile voastre</p>
-    <h1 class="fade-up d2" style="font-size:clamp(2.4rem,6vw,4rem)">Carte de urări</h1>
+    <p class="eyebrow fade-up d1" style="margin-top:14px"><?= h(text('tx_ur_eyebrow')) ?></p>
+    <h1 class="fade-up d2" style="font-size:clamp(2.4rem,6vw,4rem)"><?= h(text('tx_ur_titlu')) ?></h1>
     <div class="sub-date fade-up d2"><?= $total ?> <?= $total === 1 ? 'mesaj plin de drag' : 'mesaje pline de drag' ?></div>
   </div>
 </section>
 
 <div class="container narrow">
   <?php if (($_GET['trimis'] ?? '') === '1'): ?>
-    <div class="alerta ok">Îți mulțumim din suflet pentru urare! 🤍</div>
+    <div class="alerta ok"><?= h(text('tx_ur_multumim')) ?></div>
   <?php elseif (($_GET['trimis'] ?? '') === '2'): ?>
     <div class="alerta ok">Îți mulțumim! Urarea ta va apărea după ce o văd mirii. 🤍</div>
   <?php endif; ?>
@@ -102,16 +102,16 @@ cap_pagina('Carte de urări', 'urari');
     <input type="text" name="site" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
     <div class="campuri">
       <div class="camp">
-        <label for="nume">Numele tău *</label>
+        <label for="nume"><?= h(text('tx_ur_nume')) ?> *</label>
         <input type="text" id="nume" name="nume" maxlength="120" required placeholder="ex: Familia Popescu">
       </div>
       <div class="camp">
-        <label for="mesaj">Urarea ta *</label>
+        <label for="mesaj"><?= h(text('tx_ur_mesaj')) ?> *</label>
         <textarea id="mesaj" name="mesaj" maxlength="2000" required placeholder="Casă de piatră! Vă dorim o viață plină de iubire și fericire..."></textarea>
       </div>
     </div>
     <div style="margin-top:18px;text-align:center">
-      <button class="btn btn-primar btn-full" type="submit">Trimite urarea</button>
+      <button class="btn btn-primar btn-full" type="submit"><?= h(text('tx_ur_buton')) ?></button>
     </div>
   </form>
 </div>
@@ -119,7 +119,7 @@ cap_pagina('Carte de urări', 'urari');
 <section class="sectiune" style="padding-top:30px">
   <div class="container">
     <?php if (empty($urari)): ?>
-      <div class="gol">Fii primul care lasă o urare frumoasă pentru miri.</div>
+      <div class="gol"><?= h(text('tx_ur_gol')) ?></div>
     <?php else: ?>
       <div class="urari-grid">
         <?php foreach ($urari as $u):
