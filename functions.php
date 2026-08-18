@@ -507,9 +507,32 @@ function aprecieri_mele(array $ids): array {
    de pe același telefon — cazul obișnuit, când cineva selectează din
    greșeală aceleași poze a doua oară.
    ============================================================ */
+/* Peste atât nu mai citim tot fișierul ca să-i luăm amprenta. */
+define('AMPRENTA_INTEGRAL_MAX', 8 * 1024 * 1024);
+
 function amprenta_fisier(string $cale): ?string {
-    $h = @hash_file('sha256', $cale);
-    return $h === false ? null : $h;
+    $dim = @filesize($cale);
+    if ($dim === false) return null;
+
+    /* Pozele — și acolo se întâmplă retrimiterile — se citesc întregi:
+       e ieftin și prinde orice. */
+    if ($dim <= AMPRENTA_INTEGRAL_MAX) {
+        $h = @hash_file('sha256', $cale);
+        return $h === false ? null : $h;
+    }
+
+    /* Filmele nu: un film de 500 MB citit integral ține un proces ocupat
+       peste două secunde numai ca să afle ceva ce se vede și din primii
+       megaocteți. Luăm începutul plus mărimea exactă — două filme
+       diferite care încep la fel ȘI au exact aceeași mărime până la
+       ultimul octet practic nu există. */
+    $f = @fopen($cale, 'rb');
+    if (!$f) return null;
+    $ctx = hash_init('sha256');
+    hash_update($ctx, 'm' . $dim . ':');
+    hash_update_stream($ctx, $f, AMPRENTA_INTEGRAL_MAX);
+    fclose($f);
+    return hash_final($ctx);
 }
 
 /* Întoarce id-ul fișierului identic deja existent, dacă există. */

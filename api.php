@@ -1,6 +1,10 @@
 <?php
 require_once __DIR__ . '/functions.php';
 header('Content-Type: application/json; charset=utf-8');
+/* Galeria se schimbă tot timpul cât ține petrecerea. Fără asta, browserul
+   are voie să refolosească un răspuns vechi, iar invitatul ar derula
+   printr-un album de acum o oră fără să înțeleagă de ce. */
+header('Cache-Control: no-store');
 asigura_schema();
 
 /* Nu mai scriem nimic în sesiune de aici încolo: eliberăm blocajul, ca
