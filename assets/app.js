@@ -594,7 +594,12 @@
       idbAll().then(function (rest) {
         if (!rest || !rest.length) return;
         var banner = document.createElement('div'); banner.className = 'banner-reluare';
-        banner.innerHTML = '<span>Avem ' + rest.length + ' fișier(e) neterminat(e). Continuăm automat de unde am rămas…</span>';
+        /* „1 fișier(e) neterminat(e)" e exact genul de text care sperie
+           pe cineva care tocmai a pierdut netul. Îl scriem omenește. */
+        banner.innerHTML = '<span>' + (rest.length === 1
+            ? 'Ai un fișier rămas neterminat.'
+            : 'Ai ' + rest.length + ' fișiere rămase neterminate.')
+          + ' Continuăm automat de unde am rămas…</span>';
         var ren = document.createElement('button'); ren.className = 'btn btn-ghost btn-mic'; ren.textContent = 'Renunță';
         ren.addEventListener('click', function () { idbClear().then(function () { coada = coada.filter(function (it) { return it.status !== 'pending'; }); lista.innerHTML = ''; banner.remove(); actualizeazaButon(); }); });
         banner.appendChild(ren);
