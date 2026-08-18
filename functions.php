@@ -533,6 +533,47 @@ function are_cover(): bool {
     $f = cover_fisier();
     return $f !== '' && is_file(UPLOAD_DIR . $f);
 }
+/* Coperta vine din panou așa cum a ieșit din aparat: poate avea 4000 de
+   puncte pe lățime și câteva zeci de MB. Pe pagină intră într-o ramă de
+   520 de puncte, deci tot ce trece prin rețea peste atât e doar timp de
+   așteptare — și e prima poză de pe prima pagină, așa că browserul ține
+   rotița pornită până o termină.
+
+   Facem o dată o variantă mică, o ținem lângă miniaturi și o refolosim.
+   Dacă nu se poate face (fișier ciudat, și GD și Imagick dau greș), ne
+   întoarcem la original: pagina arată la fel, doar se încarcă greu, ca
+   înainte. */
+function cover_mic(): string {
+    static $rezultat = null;
+    if ($rezultat !== null) return $rezultat;
+
+    $f = cover_fisier();
+    if ($f === '' || !is_file(UPLOAD_DIR . $f)) return $rezultat = '';
+
+    $dest = THUMB_DIR . $f . '.jpg';
+    if (is_file($dest)) return $rezultat = $f . '.jpg';
+
+    if (!is_dir(THUMB_DIR)) @mkdir(THUMB_DIR, 0755, true);
+    if (creeaza_thumbnail(UPLOAD_DIR . $f, $dest, COVER_WIDTH)) {
+        @chmod($dest, 0644);
+        return $rezultat = $f . '.jpg';
+    }
+    return $rezultat = '';
+}
+
 function url_cover(): string {
-    return are_cover() ? UPLOAD_URL . rawurlencode(cover_fisier()) : '';
+    if (!are_cover()) return '';
+    $mic = cover_mic();
+    return $mic !== ''
+        ? THUMB_URL . rawurlencode($mic)
+        : UPLOAD_URL . rawurlencode(cover_fisier());
+}
+
+/* Șterge și varianta mică atunci când coperta e înlocuită sau scoasă,
+   altfel rămâne pe disc și, mai rău, ar fi refolosită pentru alt fișier
+   cu același nume. */
+function sterge_cover_mic(string $fisier): void {
+    if ($fisier === '') return;
+    $mic = THUMB_DIR . $fisier . '.jpg';
+    if (is_file($mic)) @unlink($mic);
 }

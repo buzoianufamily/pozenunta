@@ -36,6 +36,9 @@ define('ADMIN_PASS', 'R0765793713iPhone!');
 define('MAX_FILE_SIZE', 4 * 1024 * 1024 * 1024);
 // Lățimea miniaturilor generate pentru galerie (px). Mai mic = galerie mai rapidă.
 define('THUMB_WIDTH', 600);
+// Lățimea variantei mici a fotografiei de cuplu de pe prima pagină (px).
+// Rama ei are 520 de puncte, deci 1200 ajunge și pe ecranele fine.
+define('COVER_WIDTH', 1200);
 // Câte poze se încarcă odată în galerie (scroll infinit).
 define('PER_PAGINA', 30);
 // Spațiul TOTAL al găzduirii, în GB (pentru indicatorul din panou). Mărește-l dacă cumperi spațiu suplimentar.

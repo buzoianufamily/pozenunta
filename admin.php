@@ -86,7 +86,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         @chmod(UPLOAD_DIR . $nf, 0644);
                         $vechi = setare('cover', '');
                         if ($vechi && is_file(UPLOAD_DIR . $vechi)) @unlink(UPLOAD_DIR . $vechi);
+                        sterge_cover_mic((string)$vechi);
                         salveaza_setare('cover', $nf);
+                        /* Varianta mică se face acum, cât ești tu aici, nu
+                           la prima cerere a unui invitat — altfel el ar fi
+                           cel care așteaptă o secundă degeaba. */
+                        cover_mic();
                         $notif = ['ok', 'Fotografia de cuplu a fost setată.'];
                     } else { $notif = ['err', 'Nu s-a putut salva imaginea.']; }
                 } else { $notif = ['err', 'Format de imagine neacceptat.']; }
@@ -95,6 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($actiune === 'sterge_cover') {
             $vechi = setare('cover', '');
             if ($vechi && is_file(UPLOAD_DIR . $vechi)) @unlink(UPLOAD_DIR . $vechi);
+            sterge_cover_mic((string)$vechi);
             salveaza_setare('cover', '');
             $notif = ['ok', 'Fotografia de cuplu a fost ștearsă.'];
 

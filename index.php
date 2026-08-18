@@ -4,7 +4,20 @@ asigura_schema();
 
 $pozeRecente  = [];
 $urariRecente = [];
-try { $pozeRecente  = db()->query("SELECT * FROM poze WHERE aprobat = 1 ORDER BY data_incarcare DESC, id DESC LIMIT 9")->fetchAll(); } catch (Throwable $e) {}
+/* Fâșia de pe prima pagină vrea 9 momente. Cerem mai multe și le punem
+   întâi pe cele care au miniatură: un film fără miniatură se afișează
+   arătând chiar filmul, iar filmul are zeci de MB. Un singur asemenea
+   fișier ține prima pagină în „se încarcă" pe date mobile. Aproape toate
+   au miniatură (o face telefonul la trimitere), deci de obicei fâșia iese
+   la fel — doar că fără surpriza aceea. */
+try {
+    $candidati = db()->query("SELECT * FROM poze WHERE aprobat = 1 ORDER BY data_incarcare DESC, id DESC LIMIT 30")->fetchAll();
+    $cuMiniatura = []; $faraMiniatura = [];
+    foreach ($candidati as $c) {
+        if (are_miniatura($c)) $cuMiniatura[] = $c; else $faraMiniatura[] = $c;
+    }
+    $pozeRecente = array_slice(array_merge($cuMiniatura, $faraMiniatura), 0, 9);
+} catch (Throwable $e) {}
 try { $urariRecente = db()->query("SELECT nume, mesaj, data_creare FROM urari WHERE aprobat = 1 ORDER BY data_creare DESC, id DESC LIMIT 6")->fetchAll(); } catch (Throwable $e) {}
 
 cap_pagina('Acasă', 'acasa');
@@ -18,7 +31,7 @@ cap_pagina('Acasă', 'acasa');
     <h1 class="fade-up d2"><?= h(NUME_MIRE) ?> <span class="amp">&amp;</span> <?= h(NUME_MIREASA) ?></h1>
     <div class="sub-date fade-up d2"><?= h(DATA_NUNTII) ?></div>
     <?php if (are_cover()): ?>
-      <div class="cover-foto fade-up d3"><img src="<?= h(url_cover()) ?>" alt="<?= h(NUME_MIRE) ?> &amp; <?= h(NUME_MIREASA) ?>"></div>
+      <div class="cover-foto fade-up d3"><img src="<?= h(url_cover()) ?>" width="1200" height="900" decoding="async" fetchpriority="high" alt="<?= h(NUME_MIRE) ?> &amp; <?= h(NUME_MIREASA) ?>"></div>
     <?php endif; ?>
   </div>
 </section>
