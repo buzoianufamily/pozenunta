@@ -412,6 +412,62 @@ a.poza:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .lb-like.activ{background:rgba(179,80,62,.92)}
 .lb-like.activ svg{fill:#fff}
 
+/* Pe ecran lat învelișul nu există: săgețile și butoanele rămân
+   poziționate exact ca înainte. */
+.lb-bara{display:contents}
+
+/* ============================================================
+   LIGHTBOX PE TELEFON
+   ------------------------------------------------------------
+   Ce era greșit:
+
+   1. Săgețile au 64 de puncte lățime, dar filmul ajunge până aproape de
+      marginea ecranului și stă DEASUPRA lor. Din săgeata pe care o vezi,
+      doar bucata din afara filmului răspundea la apăsare — restul mergea
+      la film. Apăsai chevronul desenat și se oprea filmul în loc să treacă
+      la momentul următor.
+
+   2. Cât invitatul își vedea propriul fișier, rândul „inimă · Descarcă ·
+      Șterge" creștea și intra peste butonul X: pe un ecran de 320 de
+      puncte se suprapuneau 32 dintre ele.
+
+   Rezolvarea: pe ecran îngust nimic nu mai stă peste fișier. Săgețile și
+   butoanele coboară într-o bară sub el, unde ajunge degetul mare, iar
+   fișierul primește exact înălțimea rămasă. Sus rămâne doar X-ul.
+   ============================================================ */
+@media (max-width: 640px) {
+  /* Loc pentru bara de jos: fișierul nu mai ajunge niciodată sub ea. */
+  .lb-media{max-width:96vw;max-height:calc(100vh - 178px);max-height:calc(100dvh - 178px)}
+
+  .lb-bara{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    position:absolute;left:10px;right:10px;bottom:14px;z-index:10;
+  }
+
+  /* Săgețile devin rotunde, la capetele barei — în afara fișierului. */
+  .lb-btn{
+    position:static;width:44px;min-width:0;height:44px;flex:none;
+    border-radius:50%;background:rgba(255,255,255,.12);opacity:1;
+    padding:0;justify-content:center;
+  }
+  .lb-prev,.lb-next{padding:0}
+  .lb-btn svg{width:24px;height:24px}
+
+  /* Rândul de butoane, între săgeți. Se strâmtează ca să încapă toate
+     trei pe un ecran de 320; dacă tot nu încap, trec pe rândul de sub. */
+  .lb-actiune{
+    position:static;flex:1 1 auto;min-width:0;
+    display:flex;flex-wrap:wrap;justify-content:center;gap:6px;
+  }
+  .lb-actiune a,.lb-actiune .lb-link{padding:8px 11px;font-size:.68rem;letter-spacing:.04em}
+  .lb-like{padding:8px 12px;font-size:.76rem;gap:5px}
+
+  /* Subsolul urcă deasupra barei, ca să nu se încalece. */
+  .lb-caption{bottom:70px;padding:14px 16px}
+  .lb-caption .nume{font-size:1.15rem}
+  .lb-caption .mesaj{font-size:.9rem}
+}
+
 /* --- Banda cu cele mai noi poze (pagina de start) --- */
 .banda{overflow:hidden;width:100%;
   -webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);

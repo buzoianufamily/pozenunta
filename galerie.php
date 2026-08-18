@@ -35,21 +35,28 @@ cap_pagina('Galerie', 'galerie');
 <!-- Lightbox -->
 <div class="lightbox" id="lightbox" aria-hidden="true">
   <button class="lb-inchide" id="lb-inchide" aria-label="Închide">&times;</button>
-  <div class="lb-actiune">
-    <button class="lb-like" id="lb-like" aria-label="Apreciază">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
-      <span id="lb-like-n">0</span>
+  <?php /* Pe telefon, săgețile și butoanele stăteau peste film — exact
+           peste colțurile unde telefonul pune „play" și „ecran complet".
+           Aici sunt înfășurate, ca pe ecran îngust să coboare toate într-o
+           bară sub film. Pe calculator învelișul se face nevăzut
+           (display:contents) și fiecare rămâne unde era. */ ?>
+  <div class="lb-bara">
+    <button class="lb-btn lb-prev" id="lb-prev" aria-label="Înapoi">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
     </button>
-    <a class="lb-link" id="lb-download" download>Descarcă</a>
-    <!-- apare doar la fișierele încărcate de pe acest telefon -->
-    <button class="lb-link lb-sterge" id="lb-sterge" hidden>Șterge</button>
+    <div class="lb-actiune">
+      <button class="lb-like" id="lb-like" aria-label="Apreciază">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
+        <span id="lb-like-n">0</span>
+      </button>
+      <a class="lb-link" id="lb-download" download>Descarcă</a>
+      <!-- apare doar la fișierele încărcate de pe acest telefon -->
+      <button class="lb-link lb-sterge" id="lb-sterge" hidden>Șterge</button>
+    </div>
+    <button class="lb-btn lb-next" id="lb-next" aria-label="Înainte">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+    </button>
   </div>
-  <button class="lb-btn lb-prev" id="lb-prev" aria-label="Înapoi">
-    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-  </button>
-  <button class="lb-btn lb-next" id="lb-next" aria-label="Înainte">
-    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-  </button>
   <div id="lb-continut"></div>
   <div class="lb-caption" id="lb-caption"></div>
 </div>
