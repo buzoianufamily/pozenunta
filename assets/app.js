@@ -408,7 +408,7 @@
         var campuri = { actiune: 'finalizeaza', id: item.sid, name: item.name, nume: item.nume, mesaj: item.mesaj };
         var fis = item.poster ? [{ camp: 'poster', blob: item.poster, nume: 'poster.jpg' }] : null;
         var fin = await cerereBucati(campuri, fis, null);
-        if (fin && fin.ok) { item.duplicat = !!fin.duplicat; return true; }
+        if (fin && fin.ok) { item.duplicat = !!fin.duplicat; item.moderare = !!fin.moderare; return true; }
         item.ultimaEroare = (fin && fin.eroare) ? fin.eroare : null;
         return false;
       })();
@@ -426,7 +426,7 @@
             if (ok) return true;
           } else {
             var rez = await urca(item, function (p) { setStare(item, 'Se încarcă… ' + Math.round(p * 100) + '%', p); });
-            if (rez && rez.ok) { item.duplicat = !!rez.duplicat; return true; }
+            if (rez && rez.ok) { item.duplicat = !!rez.duplicat; item.moderare = !!rez.moderare; return true; }
             item.ultimaEroare = (rez && rez.erori && rez.erori[0]) ? rez.erori[0] : null;
           }
           if (t < MAX_TRIES - 1) {
@@ -497,13 +497,39 @@
       var dubl  = gata.filter(function (it) { return it.duplicat; }).length;
       var noi   = done - dubl;
       var erori = coada.filter(function (it) { return it.status === 'error'; }).length;
+      /* Când e un singur fișier, spunem ce este. „Fotografia ta a fost
+         adăugată" după un film de 40 MB sună a greșeală, iar la nuntă se
+         încarcă multe filme. La mai multe deodată ramane „fișiere", care
+         e potrivit oricum ar fi amestecate. */
+      var unNou  = noi  === 1 ? gata.filter(function (it) { return !it.duplicat; })[0] : null;
+      var unVechi= dubl === 1 ? gata.filter(function (it) { return  it.duplicat; })[0] : null;
+
+      /* Când mirii au pornit moderarea, fișierul NU e încă în album — îl
+         văd ei întâi. Serverul spunea asta în răspuns, dar pagina nu se
+         uita: invitatul era trimis într-o galerie unde poza lui nu era,
+         și credea că s-a stricat ceva. */
+      var subModerare = gata.some(function (it) { return it.moderare && !it.duplicat; });
+      var eFilm = unNou && unNou.isVideo;
+
       if (done > 0 && erori === 0) {
         if (noi === 0) {
           succesTxt.textContent = dubl === 1
-            ? 'Această fotografie era deja în album.'
+            ? (unVechi && unVechi.isVideo ? 'Acest film era deja în album.' : 'Această fotografie era deja în album.')
             : 'Toate cele ' + dubl + ' fișiere erau deja în album.';
         } else {
-          succesTxt.textContent = (noi === 1 ? 'Fotografia ta a fost adăugată în album.' : 'Cele ' + noi + ' fișiere au fost adăugate în album.')
+          var subiect = noi === 1 ? (eFilm ? 'Filmul tău' : 'Fotografia ta') : 'Cele ' + noi + ' fișiere';
+          var urmare;
+          if (subModerare) {
+            urmare = noi === 1
+              ? (eFilm ? ' a ajuns la miri și va apărea în album după ce îl văd. 🤍'
+                       : ' a ajuns la miri și va apărea în album după ce o văd. 🤍')
+              : ' au ajuns la miri și vor apărea în album după ce le văd. 🤍';
+          } else {
+            urmare = noi === 1
+              ? (eFilm ? ' a fost adăugat în album.' : ' a fost adăugată în album.')
+              : ' au fost adăugate în album.';
+          }
+          succesTxt.textContent = subiect + urmare
             + (dubl > 0 ? (dubl === 1 ? ' Unul era deja acolo.' : ' ' + dubl + ' erau deja acolo.') : '');
         }
         zona.style.display = 'none'; succes.style.display = 'block';
