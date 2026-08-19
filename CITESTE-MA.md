@@ -30,7 +30,7 @@ Domeniu: **nunta.razvanbuzoianu.ro** · Bază de date: **r140100buzo_pozenunta**
    - `ADMIN_USER` și **`ADMIN_PASS`** — utilizatorul și parola cu care intri în panou (acum se setează aici!).
 
    Atenție: dacă păstrezi vechiul `config.php`, autentificarea NU va merge, pentru că s-a redenumit `ADMIN_PASS_INITIALA` -> `ADMIN_PASS`. Cel mai sigur: folosește noul `config.php` și completează cele 5 valori.
-3. **De obicei nu trebuie să rulezi nimic în baza de date** — la prima accesare aplicația își adaugă singură ce îi lipsește. Dacă totuși ceva nu merge, deschide `instalare.php` (cere autentificare) și îți spune exact ce lipsește și creează la apăsarea unui buton. Nu șterge niciodată date, deci poate fi rulat oricând.
+3. **Nu trebuie să rulezi nimic în baza de date** — la prima accesare aplicația își adaugă singură ce îi lipsește. (`instalare.php` a fost scos de pe server; vezi capitolul 11 dacă vreodată ai nevoie de el înapoi.)
 4. **Reîmprospătează cu Ctrl+F5** (sau golește cache-ul) ca să se încarce noul design și noul cod.
 5. Intră în panou (`login.php`), mergi la **Setări -> Fotografia de cuplu** și încarcă poza voastră de copertă (când o ai).
 
@@ -40,8 +40,8 @@ Domeniu: **nunta.razvanbuzoianu.ro** · Bază de date: **r140100buzo_pozenunta**
 
 1. Urcă toate fișierele în `public_html`.
 2. Editează `config.php`: datele bazei de date, `SITE_URL`, `ADMIN_USER`, `ADMIN_PASS`.
-3. Intră pe `https://nunta.razvanbuzoianu.ro/login.php`, apoi deschide `instalare.php` și apasă butonul (creează tabelele).
-4. Dacă mai ai pe server un `setup.php` din instalarea veche, **șterge-l** — nu cerea autentificare, deci îl putea deschide oricine. `instalare.php` îl înlocuiește și e protejat prin login.
+3. Deschide site-ul o dată în browser: aplicația își creează singură ce îi lipsește din baza de date.
+4. Dacă baza de date e complet goală și pasul 3 nu ajunge, vezi capitolul 11 (cum aduci înapoi `instalare.php` pentru câteva minute).
 5. Gata — pagina de start e `index.php`.
 
 ---
@@ -101,10 +101,30 @@ Casă de piatră!
 - **Un film pe care telefonul nu-l poate reda** (de obicei un `.mov` filmat cu iPhone-ul, deschis pe Android) arată un mesaj scurt și un buton de descărcare, în loc de un dreptunghi negru.
 - **Adrese curate:** `/galerie` și `/urari` merg și fără `.php`.
 - **Textele de pe pagini se schimbă din panou** — titluri, îndemnuri, etichetele câmpurilor, mesajele de mulțumire. Un buton le aduce pe toate înapoi la varianta de pornire.
+- **Butoanele din vizualizator au înălțime de deget** (44 de puncte, minimul cerut și de Apple, și de Google). Inima avea 34 și „Descarcă" 29 — încăpeau sub degetul mare doar dacă nimereai bine, iar pe inimă se apasă des.
 
 ## 10. Ce trebuie făcut înainte de nuntă
 
 1. **Șterge fișierele de probă** din `uploads/` (păstrează `index.html`, `.htaccess` și folderul `thumbs`).
 2. **Verifică pe telefonul tău real**, pe site-ul adevărat: urci o poză și un film, le deschizi în galerie, pui o inimă, ștergi ce ai pus, lași o urare. Dacă merg astea cinci, merge tot.
-3. **Lasă moderarea oprită** în seara nunții, ca pozele să apară pe loc.
-4. **Printează codul QR** ultimul, după ce ai terminat de umblat la el.
+3. **Dă linkul unui om**, fără să-i explici nimic, și uită-te tăcut cum se descurcă cinci minute. E singura probă care găsește ce nu găsește nicio verificare de cod: nedumerirea unui om adevărat.
+4. **Lasă moderarea oprită** în seara nunții, ca pozele să apară pe loc.
+5. **Printează codul QR** ultimul, după ce ai terminat de umblat la el.
+
+---
+
+## 11. `info.php` și `instalare.php` — scoase de pe server
+
+Amândouă au fost **șterse de pe server** înainte de nuntă, și e bine așa:
+
+- `info.php` era pagina de diagnostic. Pe lângă versiunile de PHP și de bază de date, ea arăta și **cookie-ul de sesiune al celui care o deschidea** — adică, dacă ajungea pe mâna cui nu trebuie, cheia panoului de administrare. Aplicația nu are nevoie de ea ca să funcționeze.
+- `instalare.php` crea tabelele la prima instalare. Nu mai e nevoie de el: aplicația își adaugă singură ce îi lipsește la prima accesare.
+
+**Atenție la o capcană:** amândouă există în continuare în arhiva codului, iar site-ul se actualizează urcând folderul întreg. O singură re-urcare le-ar pune înapoi pe server, fără să bagi de seamă. De aceea `.htaccess` are acum o regulă care le ține închise chiar dacă fișierele ajung din nou acolo — cine le cere primește „acces interzis", nu conținutul lor.
+
+**Dacă vreodată chiar ai nevoie de `instalare.php`** (s-a stricat baza de date):
+
+1. În cPanel -> File Manager, deschide `.htaccess` la editare.
+2. Găsește blocul `<FilesMatch "(?i)^(info|instalare|setup)\.php$">` și pune un `#` la începutul fiecăruia dintre cele trei rânduri.
+3. Urcă `instalare.php` din arhivă, intră pe `login.php`, apoi deschide-l și apasă butonul.
+4. **Scoate diezii înapoi** și șterge din nou fișierul. Nu-l lăsa acolo.

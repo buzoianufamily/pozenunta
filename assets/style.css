@@ -511,8 +511,15 @@ img{max-width:100%;display:block}
     position:static;flex:1 1 auto;min-width:0;
     display:flex;flex-wrap:wrap;justify-content:center;gap:6px;
   }
-  .lb-actiune a,.lb-actiune .lb-link{padding:8px 11px;font-size:.68rem;letter-spacing:.04em}
-  .lb-like{padding:8px 12px;font-size:.76rem;gap:5px}
+  /* Înălțime de deget. Erau 29 și 34 de puncte — încap sub degetul mare
+     doar dacă nimerești bine, iar pe inimă se apasă des. 44 e minimul pe
+     care îl cer și Apple, și Google. Lățimea rămâne cât textul, deci
+     bara nu se lățește și nu se strică așezarea de la 320 în sus. */
+  .lb-actiune a,.lb-actiune .lb-link{
+    padding:8px 11px;font-size:.68rem;letter-spacing:.04em;
+    min-height:44px;display:inline-flex;align-items:center;justify-content:center;
+  }
+  .lb-like{padding:8px 12px;font-size:.76rem;gap:5px;min-height:44px}
 
   /* Subsolul urcă deasupra barei, ca să nu se încalece. */
   .lb-caption{bottom:70px;padding:14px 16px}
