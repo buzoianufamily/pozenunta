@@ -243,11 +243,17 @@ if ($actiune === 'finalizeaza') {
 
     /* Miniatura: imaginile din fișierul propriu-zis, filmele din
        posterul trimis de telefon. */
+    $caleMiniatura = THUMB_DIR . $numeFisier . '.jpg';
     if ($tip === 'imagine') {
-        @creeaza_thumbnail($destinatie, THUMB_DIR . $numeFisier . '.jpg');
+        @creeaza_thumbnail($destinatie, $caleMiniatura);
     } elseif (!empty($_FILES['poster']) && (($_FILES['poster']['error'] ?? 1) === UPLOAD_ERR_OK)
               && is_uploaded_file($_FILES['poster']['tmp_name'])) {
-        @creeaza_thumbnail($_FILES['poster']['tmp_name'], THUMB_DIR . $numeFisier . '.jpg');
+        @creeaza_thumbnail($_FILES['poster']['tmp_name'], $caleMiniatura);
+    }
+    /* Filmul a rămas fără miniatură (telefonul n-a putut scoate un cadru).
+       Încercăm noi, dacă găzduirea are cu ce. */
+    if ($tip === 'video' && !is_file($caleMiniatura)) {
+        @thumbnail_din_film($destinatie, $caleMiniatura);
     }
 
     try {

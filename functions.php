@@ -513,6 +513,102 @@ function aprecieri_mele(array $ids): array {
 }
 
 /* ============================================================
+   MINIATURĂ PENTRU FILME, SCOASĂ PE SERVER
+   ------------------------------------------------------------
+   De obicei telefonul trimite el primul cadru. Când nu reușește —
+   iPhone-ul care nu apucă să pregătească un cadru, un format pe
+   care browserul nu-l deschide — filmul rămânea fără miniatură și
+   în bandă apărea un dreptunghi gol.
+
+   Dacă găzduirea are ffmpeg, îl scoatem noi. Dacă nu are, sau dacă
+   rularea de programe e interzisă (obișnuit pe găzduiri partajate),
+   totul merge exact ca înainte: nu se strică nimic, doar rămâne
+   dreptunghiul.
+   ============================================================ */
+function poate_rula_programe(): bool {
+    static $poate = null;
+    if ($poate !== null) return $poate;
+    if (!function_exists('proc_open')) return $poate = false;
+    $interzise = array_map('trim', explode(',', (string)ini_get('disable_functions')));
+    return $poate = !in_array('proc_open', $interzise, true);
+}
+
+function ffmpeg_cale(): ?string {
+    static $cale = false;
+    if ($cale !== false) return $cale;
+    if (!poate_rula_programe()) return $cale = null;
+
+    $candidati = ['/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/opt/bin/ffmpeg', '/bin/ffmpeg'];
+    foreach ($candidati as $c) {
+        if (@is_executable($c)) return $cale = $c;
+    }
+    /* Poate e în altă parte: întrebăm sistemul unde îl ține. */
+    $gasit = ruleaza_program(['/usr/bin/which', 'ffmpeg'], 5);
+    if ($gasit !== null) {
+        $linie = trim(strtok($gasit, "\n"));
+        if ($linie !== '' && @is_executable($linie)) return $cale = $linie;
+    }
+    return $cale = null;
+}
+
+/* Rulează un program cu un termen limită și întoarce ce a scris.
+   Termenul contează: un fișier stricat poate ține ffmpeg agățat, iar
+   un proces agățat înseamnă un invitat care așteaptă degeaba. */
+function ruleaza_program(array $argumente, int $secunde = 20): ?string {
+    if (!poate_rula_programe()) return null;
+    $desc = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+    $p = @proc_open($argumente, $desc, $tevi);
+    if (!is_resource($p)) return null;
+
+    stream_set_blocking($tevi[1], false);
+    stream_set_blocking($tevi[2], false);
+    $iesire = '';
+    $limita = microtime(true) + $secunde;
+    while (true) {
+        $stare = proc_get_status($p);
+        $iesire .= (string)stream_get_contents($tevi[1]);
+        stream_get_contents($tevi[2]);              // golim, ca să nu se umple țeava
+        if (!$stare['running']) break;
+        if (microtime(true) > $limita) { @proc_terminate($p, 9); break; }
+        usleep(50000);
+    }
+    foreach ($tevi as $t) { @fclose($t); }
+    @proc_close($p);
+    return $iesire;
+}
+
+/* Scoate un cadru din film și îl face miniatură. Întoarce true la reușită. */
+function thumbnail_din_film(string $film, string $destinatie): bool {
+    $ffmpeg = ffmpeg_cale();
+    if ($ffmpeg === null || !is_file($film)) return false;
+    if (!asigura_folder_miniaturi()) return false;
+
+    $temp = THUMB_DIR . '.cadru_' . bin2hex(random_bytes(6)) . '.png';
+
+    /* Întâi la o secundă — începutul multor filme e negru, de la tranziție.
+       Dacă filmul e mai scurt de atât, ffmpeg nu scoate nimic și încercăm
+       de la primul cadru. „-ss" înainte de „-i" sare direct acolo, fără să
+       citească filmul de la cap: contează la un film de sute de MB. */
+    foreach (['1', '0'] as $secunda) {
+        ruleaza_program([
+            $ffmpeg, '-hide_banner', '-loglevel', 'error',
+            '-ss', $secunda, '-i', $film,
+            '-frames:v', '1', '-an', '-y', $temp,
+        ], 25);
+        if (is_file($temp) && filesize($temp) > 0) break;
+        @unlink($temp);
+    }
+    if (!is_file($temp) || filesize($temp) === 0) { @unlink($temp); return false; }
+
+    /* Din PNG facem miniatura obișnuită, cu unealta pe care o avem deja.
+       Trecem prin GD anume: nu toate instalările de ffmpeg pot scrie JPEG. */
+    $ok = creeaza_thumbnail($temp, $destinatie);
+    @unlink($temp);
+    if ($ok) @chmod($destinatie, 0644);
+    return (bool)$ok;
+}
+
+/* ============================================================
    FIȘIERE DUPLICATE
    ------------------------------------------------------------
    Amprenta se calculează din conținutul fișierului, nu din nume:
