@@ -36,7 +36,21 @@ try {
         $pozeRecente = array_slice(array_merge($cuMiniatura, $faraMiniatura), 0, BANDA_MOMENTE);
     }
 } catch (Throwable $e) {}
-try { $urariRecente = db()->query("SELECT nume, mesaj, data_creare FROM urari WHERE aprobat = 1 ORDER BY data_creare DESC, id DESC LIMIT 6")->fetchAll(); } catch (Throwable $e) {}
+/* Urările curg la fel ca momentele: amestecate din toată cartea, ca să nu
+   rămână aceleași șase pe toată seara. Aceeași socoteală ca la poze —
+   amestecăm id-uri, nu rânduri întregi. */
+define('BANDA_URARI', 12);
+try {
+    $idsU = db()->query('SELECT id FROM urari WHERE aprobat = 1 ORDER BY RAND() LIMIT ' . BANDA_URARI)
+                 ->fetchAll(PDO::FETCH_COLUMN);
+    if ($idsU) {
+        $sem = implode(',', array_fill(0, count($idsU), '?'));
+        $st  = db()->prepare("SELECT nume, mesaj, data_creare FROM urari WHERE id IN ($sem)");
+        $st->execute(array_map('intval', $idsU));
+        $urariRecente = $st->fetchAll();
+        shuffle($urariRecente);
+    }
+} catch (Throwable $e) {}
 
 cap_pagina('Acasă', 'acasa');
 ?>
@@ -80,7 +94,9 @@ cap_pagina('Acasă', 'acasa');
           </div>
           <div class="titlu"><?= h(text('tx_drop_titlu')) ?></div>
           <div class="desc"><?= h(text('tx_drop_desc')) ?></div>
-          <div class="formate">JPG · PNG · HEIC · GIF · MP4 · MOV</div>
+          <?php /* Lista de formate a fost scoasă anume: invitatului nu-i
+                   spune nimic „HEIC" sau „M4V", iar ce trimite telefonul lui
+                   e primit oricum. Acceptarea din cod a rămas neschimbată. */ ?>
         </div>
         <input type="file" id="input-fisiere" accept="image/*,video/*" multiple hidden>
 
@@ -188,15 +204,38 @@ cap_pagina('Acasă', 'acasa');
       <div class="ornament"><span class="ln"></span><span class="dot"></span><span class="ln r"></span></div>
       <h2 style="font-size:clamp(1.7rem,4vw,2.3rem)"><?= h(text('tx_urari_titlu')) ?></h2>
     </div>
-    <div class="urari-grid">
-      <?php foreach ($urariRecente as $u): ?>
-        <figure class="urare-card fade-up">
-          <blockquote class="urare-text">„<?= h($u['mesaj']) ?>”</blockquote>
-          <figcaption class="urare-semn"><?= h($u['nume']) ?><span class="urare-data"><?= date('d.m.Y', strtotime($u['data_creare'])) ?></span></figcaption>
-        </figure>
-      <?php endforeach; ?>
+    <?php
+      /* Aceeași socoteală ca la bandă de poze: repetăm lista până când o
+         tură trece de un ecran lat, apoi o dublăm pentru buclă. Cu două
+         urări scrise, banda s-ar roti altfel cu un gol în urma ei.
+         Cartonașele sunt mai late decât plăcile cu poze, deci ajung mai
+         puține pe o tură. */
+      $minUrariPeTura = 7;                      // 7 × (300 + 16) ≈ 2200 puncte
+      $setU = $urariRecente;
+      while (count($setU) < $minUrariPeTura) $setU = array_merge($setU, $urariRecente);
+      $originaleU = count($urariRecente);
+      /* Urările se citesc, nu se privesc: le lăsăm să treacă mai încet. */
+      $durataU = max(30, count($setU) * 7);
+    ?>
+    <div class="banda banda-urari" aria-label="Urări de la invitați">
+      <div class="banda-pista" style="animation-duration:<?= (int)$durataU ?>s">
+        <?php for ($copie = 0; $copie < 2; $copie++): ?>
+          <?php foreach ($setU as $k => $u):
+            $decor = $copie > 0 || $k >= $originaleU;
+          ?>
+            <a class="urare-placa" href="urari"
+               <?= $decor ? 'aria-hidden="true" tabindex="-1"' : 'aria-label="Vezi toate urările"' ?>>
+              <span class="urare-corp"><span class="urare-text">„<?= h($u['mesaj']) ?>”</span></span>
+              <span class="urare-semn">
+                <span class="nume"><?= h($u['nume']) ?></span>
+                <span class="urare-data"><?= date('d.m.Y', strtotime($u['data_creare'])) ?></span>
+              </span>
+            </a>
+          <?php endforeach; ?>
+        <?php endfor; ?>
+      </div>
     </div>
-    <div style="text-align:center;margin-top:20px"><a class="btn btn-ghost" href="urari">Vezi toate urările</a></div>
+    <div style="text-align:center;margin-top:22px"><a class="btn btn-ghost" href="urari">Vezi toate urările</a></div>
   </div>
 </section>
 <?php endif; ?>
