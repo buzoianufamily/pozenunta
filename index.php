@@ -212,7 +212,11 @@ cap_pagina('Acasă', 'acasa');
          puține pe o tură. */
       $minUrariPeTura = 7;                      // 7 × (300 + 16) ≈ 2200 puncte
       $setU = $urariRecente;
-      while (count($setU) < $minUrariPeTura) $setU = array_merge($setU, $urariRecente);
+      /* Paza nu e de prisos: fără ea, o listă goală ar repeta la nesfârșit
+         un nimic și ar ține pagina agățată. Astăzi secțiunea nu se
+         afișează când nu există urări, dar bucla nu trebuie să depindă de
+         un „dacă" aflat la cincisprezece rânduri distanță. */
+      if ($setU) { while (count($setU) < $minUrariPeTura) $setU = array_merge($setU, $urariRecente); }
       $originaleU = count($urariRecente);
       /* Urările se citesc, nu se privesc: le lăsăm să treacă mai încet. */
       $durataU = max(30, count($setU) * 7);
