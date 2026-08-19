@@ -64,6 +64,12 @@ img{max-width:100%;display:block}
   border-bottom:1px solid rgba(191,155,79,.28);
 }
 .nav{display:flex;align-items:center;justify-content:space-between;height:68px}
+/* Logo-ul măsoară 67 pe 40 — patru puncte sub pragul de deget. Am
+   încercat să-i lărgesc zona de atins ca la meniu și la inimă, dar pe
+   telefon în portret meniul stă chiar sub el: zonele lărgite se călcau,
+   iar logo-ul fura apăsările de pe „Galerie". Patru puncte nu merită
+   asta, mai ales că un deget alunecat pe logo nu strică nimic — cel
+   mult nu se întâmplă nimic. Îl lăsăm cum e, anume. */
 .brand{display:flex;align-items:baseline;gap:.5rem;font-family:var(--serif)}
 .brand .mono{font-size:1.5rem;font-weight:600;letter-spacing:.02em;color:#fff}
 /* Greutatea e pusă anume. Fără ea, „&" moștenea 600 de la .mono, iar
@@ -76,6 +82,19 @@ img{max-width:100%;display:block}
 .nav-links a{
   font-size:.82rem;letter-spacing:.14em;text-transform:uppercase;color:#d8c79a;
   position:relative;padding:.2rem 0;transition:color .2s;
+}
+/* Legăturile din meniu sunt scrise mic, cu majuscule rărite — arată bine,
+   dar măsurate aveau 25 de puncte pe înălțime, iar degetul are nevoie de
+   44. Ca la inimă: întindem doar zona de atins, nu și scrisul, ca antetul
+   să rămână exact cum e. Pe lățime nu e nevoie — cea mai îngustă are 50.
+
+   Zona nu e centrată, ci împinsă în jos anume: pe telefon logo-ul stă
+   chiar deasupra, cu 8 puncte între ele. Centrată, zona intra 2 puncte
+   peste logo și i-ar fi furat apăsările. Așa urcă exact cât e loc (8) și
+   ia restul în jos, unde nu e nimic: 6 + 25 + 13 = 44, cu doi puncte
+   rămași liberi între zonă și marginea de jos a logo-ului. */
+.nav-links a::before{
+  content:"";position:absolute;left:0;right:0;top:-6px;bottom:-13px;
 }
 .nav-links a:hover{color:#fff}
 .nav-links a.activ{color:#fff}
@@ -429,7 +448,11 @@ img{max-width:100%;display:block}
 .galerie-bar{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:6px}
 .chip{font-family:var(--sans);font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;
   padding:9px 18px;border-radius:999px;border:1px solid var(--line);background:var(--card);
-  color:var(--ink-soft);cursor:pointer;transition:all .2s}
+  color:var(--ink-soft);cursor:pointer;transition:all .2s;
+  /* 38 de puncte măsurate; până la 44 lipseau șase. Aici se poate pune
+     direct în buton, fără umbră nevăzută: cele două stau unul lângă
+     altul pe orizontală, deci creșterea pe înălțime nu calcă nimic. */
+  min-height:44px}
 .chip:hover{border-color:var(--accent)}
 .chip.activ{background:var(--green);border-color:var(--green);color:#fff}
 
@@ -438,6 +461,28 @@ img{max-width:100%;display:block}
   background:rgba(20,15,10,.42);color:#fff;border:0;border-radius:999px;padding:6px 10px;
   font-family:var(--sans);font-size:.78rem;cursor:pointer;
   -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);transition:transform .15s,background .2s}
+/* Inima se vede mică și îngrijită, dar degetul are nevoie de mai mult:
+   măsurată, avea 47 pe 30, iar sub 44 se ratează des. Când o ratezi nu
+   se întâmplă nimic bun — apeși placa de dedesubt și îți sare poza pe
+   tot ecranul, deși voiai doar să pui o inimă. Umbra asta nevăzută
+   întinde zona de atins la 44 fără să schimbe nimic din cum arată.
+
+   Ancorată pe marginile butonului, NU centrată procentual: prima
+   încercare folosea width/height 100% cu min-width/min-height și
+   translate, iar zona ieșea mult mai mare decât socoteam — pe un ecran
+   de 320 ajungea peste mijlocul plăcii, așa că apăsarea pe mijlocul
+   pozei punea inimă în loc să deschidă poza. Cu margini fixe se vede
+   exact cât se întinde.
+
+   Și crește DOAR în sus, spre marginea plăcii, niciodată în jos. Cu 7
+   puncte în fiecare parte, pe un ecran de 320 zona ajungea destul de
+   aproape de mijlocul pozei încât browserul să tragă apăsarea spre ea:
+   apăsai mijlocul pozei și primeai o inimă în loc să se deschidă poza.
+   Inima stă în colțul de sus, deci are loc în sus: 14 + 30 = 44, iar
+   marginea de jos rămâne exact unde era. */
+.poza .inima::before{
+  content:"";position:absolute;left:0;right:0;top:-14px;bottom:0;
+}
 .poza .inima:hover{transform:scale(1.06);background:rgba(20,15,10,.6)}
 .poza .inima.activ{background:rgba(179,80,62,.92)}
 .poza .inima.activ svg{fill:#fff;stroke:#fff}
