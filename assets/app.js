@@ -123,16 +123,47 @@
         var gata = false;
         function termina(blob) { if (gata) return; gata = true; try { URL.revokeObjectURL(url); } catch (e) {} resolve(blob); }
         v.addEventListener('loadeddata', function () {
-          try { var d = (v.duration && isFinite(v.duration)) ? v.duration : 2; v.currentTime = Math.min(1, d / 2); }
-          catch (e) { termina(null); }
+          /* Pe iPhone, un film care n-a rulat niciodată se desenează pe
+             pânză ca un dreptunghi negru: decodorul nu are încă un cadru.
+             O pornire scurtă, fără sunet, îl face să pregătească unul.
+             Dacă telefonul refuză pornirea, mergem mai departe oricum —
+             pe alte telefoane cadrul e deja acolo. */
+          var porneste = null;
+          try { porneste = v.play(); } catch (e) {}
+          Promise.resolve(porneste).catch(function () {}).then(function () {
+            try { v.pause(); } catch (e) {}
+            try { var d = (v.duration && isFinite(v.duration)) ? v.duration : 2; v.currentTime = Math.min(1, d / 2); }
+            catch (e) { termina(null); }
+          });
         });
+
+        /* Un cadru complet negru nu e o miniatură, e o pată. Mai rău,
+           serverul l-ar lua drept miniatură bună și galeria ar arăta un
+           pătrat negru în loc să se descurce altfel. Pipăim câteva puncte
+           și, dacă toate sunt la fel de întunecate, spunem că n-am reușit. */
+        function cadruGol(ctx, w, h) {
+          try {
+            var pasX = Math.max(1, Math.floor(w / 8)), pasY = Math.max(1, Math.floor(h / 8)), maxim = 0;
+            for (var x = 0; x < w; x += pasX) {
+              for (var y = 0; y < h; y += pasY) {
+                var p = ctx.getImageData(x, y, 1, 1).data;
+                var lum = 0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2];
+                if (lum > maxim) maxim = lum;
+              }
+            }
+            return maxim < 12;         // tot ce am pipăit e practic negru
+          } catch (e) { return false; }  // pânză „murdărită": nu putem ști, o păstrăm
+        }
+
         v.addEventListener('seeked', function () {
           try {
             var w = v.videoWidth || 600, h = v.videoHeight || 400;
             var scale = Math.min(1, 700 / Math.max(w, h));
             var c = document.createElement('canvas');
             c.width = Math.round(w * scale) || 600; c.height = Math.round(h * scale) || 400;
-            c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+            var ctx = c.getContext('2d');
+            ctx.drawImage(v, 0, 0, c.width, c.height);
+            if (cadruGol(ctx, c.width, c.height)) { termina(null); return; }
             c.toBlob(function (b) { termina(b); }, 'image/jpeg', 0.8);
           } catch (e) { termina(null); }
         });
