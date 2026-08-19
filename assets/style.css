@@ -352,6 +352,17 @@ a.poza:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .admin-poza .ic.sterge:hover{background:var(--err);color:#fff}
 .admin-poza .ic.aproba:hover{background:var(--ok);color:#fff}
 
+/* Căsuța de bifat stă peste poză, unde fundalul poate fi orice culoare:
+   fără un suport alb se pierdea complet pe o poză deschisă. Iar pe telefon
+   avea 13 puncte — se nimerește cu cursorul, nu cu degetul mare, exact
+   când mirii vor să aleagă câteva poze de șters. */
+.admin-poza .poz-check{
+  display:flex;align-items:center;justify-content:center;
+  width:30px;height:30px;border-radius:9px;
+  background:rgba(255,255,255,.88);box-shadow:0 1px 5px rgba(0,0,0,.3);
+}
+.admin-poza .poz-check .chk{width:16px;height:16px;margin:0;accent-color:var(--green-deep);cursor:pointer}
+
 /* ------------------------------------------------------------
    Pe telefon nu există trecere cu mouse-ul, deci „apare la hover"
    înseamnă „nu apare niciodată". Butoanele de aprobat și de șters
@@ -366,6 +377,8 @@ a.poza:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 @media (hover: none) {
   .admin-poza .actiuni{opacity:1}
   .admin-poza .ic{width:36px;height:36px;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+  .admin-poza .poz-check{width:40px;height:40px;border-radius:11px}
+  .admin-poza .poz-check .chk{width:22px;height:22px}
   /* Numele invitatului se vedea tot doar la hover; pe telefon îl
      lăsăm mereu la vedere, altfel nu se știe a cui e poza. */
   .poza .pe-poza{opacity:1}
