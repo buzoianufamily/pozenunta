@@ -56,9 +56,9 @@ function cap_pagina(string $titlu, string $paginaActiva = ''): void {
       <span class="date"><?= h(DATA_NUNTII) ?></span>
     </a>
     <nav class="nav-links">
-      <a href="/" class="<?= $paginaActiva==='acasa'?'activ':'' ?>">Încarcă poze sau clipuri</a>
-      <a href="galerie" class="<?= $paginaActiva==='galerie'?'activ':'' ?>">Galerie</a>
-      <a href="urari" class="<?= $paginaActiva==='urari'?'activ':'' ?>">Carte de urări</a>
+      <a href="/" class="<?= $paginaActiva==='acasa'?'activ':'' ?>"><?= h(text('tx_meniu_acasa')) ?></a>
+      <a href="galerie" class="<?= $paginaActiva==='galerie'?'activ':'' ?>"><?= h(text('tx_meniu_galerie')) ?></a>
+      <a href="urari" class="<?= $paginaActiva==='urari'?'activ':'' ?>"><?= h(text('tx_meniu_urari')) ?></a>
     </nav>
   </div>
 </header>
