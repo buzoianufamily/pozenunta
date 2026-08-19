@@ -258,6 +258,17 @@ rand_raport('Imagini', 'Imagick', $areImagick ? 'instalată' : 'lipsește', 'inf
 
 rand_raport('Imagini', 'Lățime miniatură (config)', THUMB_WIDTH . ' px', 'info', 'Mai mic = galerie mai rapidă.');
 
+/* Miniatura filmelor o face de obicei telefonul. Când nu poate, serverul
+   încearcă singur — dar numai dacă are cu ce. Aici se vede dacă are. */
+$potRula = poate_rula_programe();
+$ffmpeg  = $potRula ? ffmpeg_cale() : null;
+rand_raport('Imagini', 'Miniaturi pentru filme, pe server',
+    $ffmpeg !== null ? 'ffmpeg găsit (' . h($ffmpeg) . ')' : ($potRula ? 'ffmpeg lipsește' : 'rularea programelor e oprită'),
+    $ffmpeg !== null ? 'ok' : 'info',
+    $ffmpeg !== null
+        ? 'Când telefonul nu reușește să scoată primul cadru, îl scoate serverul.'
+        : 'Nu e obligatoriu. Aproape toate filmele primesc miniatura de la telefonul care le-a trimis; cele care nu, apar în bandă cu un dreptunghi și semnul de play.');
+
 /* ============================================================
    4. BAZA DE DATE
    ============================================================ */
