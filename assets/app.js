@@ -47,7 +47,11 @@
       return '<video class="mini-video" src="' + esc(p.original) + '#t=0.1"'
            + ' preload="metadata" muted playsinline tabindex="-1"></video>';
     }
-    return '<img loading="lazy" src="' + esc(p.preview) + '" alt="' + textAlternativ + '">';
+    /* „onerror": o miniatură care nu ajunge — sau care lipsește de pe disc —
+       lăsa placa turtită la douăzeci de puncte, iar galeria părea goală.
+       Marcăm placa și CSS-ul îi dă o formă normală, cu un semn discret. */
+    return '<img loading="lazy" src="' + esc(p.preview) + '" alt="' + textAlternativ + '"'
+         + ' onerror="this.closest(\'.poza\').classList.add(\'fara-imagine\');this.remove()">';
   }
 
   /* Serverul e sursa de adevăr: ține aprecierile pe invitat, nu pe
@@ -848,6 +852,24 @@
       lbCont.innerHTML = p.tip === 'video'
         ? '<video class="lb-media" src="' + esc(p.original) + '" controls autoplay playsinline></video>'
         : '<img class="lb-media" src="' + esc(p.original) + '" alt="">';
+
+      /* Poza mare nu ajunge — pe wi-fi-ul sălii, un fișier de un megaoctet
+         și jumătate poate pica. Fără asta, invitatul apăsa pe o poză și
+         primea un ecran negru, fără un cuvânt. */
+      if (p.tip !== 'video') {
+        lbCont.querySelector('img').addEventListener('error', function () {
+          if (lbIdActual !== p.id) return;
+          lbCont.innerHTML =
+            '<div class="lb-neredabil">' +
+              '<svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M12 8v5"/><path d="M12 16.5v.01"/><circle cx="12" cy="12" r="9"/></svg>' +
+              '<div class="titlu">Fotografia nu s-a putut încărca</div>' +
+              '<p>Probabil a fost o clipă de conexiune proastă.</p>' +
+              '<button type="button" class="btn btn-primar" id="lb-reincarca">Încearcă din nou</button>' +
+            '</div>';
+          var b = document.getElementById('lb-reincarca');
+          if (b) b.addEventListener('click', function () { randeaza(idxCurent); });
+        });
+      }
 
       /* Un iPhone care filmează în 4K scoate un .mov pe care telefoanele
          Android și multe calculatoare nu îl pot deschide. Miniatura din

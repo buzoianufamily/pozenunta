@@ -200,6 +200,12 @@ a.poza:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
    nu pornește filmul în miniatură. */
 .poza video,.banda-item video{pointer-events:none}
 .poza img,.poza video{width:100%;height:auto;display:block;transition:transform .5s ease}
+/* Placa a cărei miniatură nu a ajuns: fără asta se turtea la câțiva
+   pixeli și galeria părea goală. Rămâne o suprafață normală, discretă. */
+.poza.fara-imagine{aspect-ratio:4/3;background:linear-gradient(135deg,var(--bg-2),var(--accent-soft));
+  display:flex;align-items:center;justify-content:center}
+.poza.fara-imagine::after{content:"";width:26px;height:26px;border-radius:6px;
+  border:2px solid var(--accent);opacity:.45}
 .poza:hover img{transform:scale(1.04)}
 .poza .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(20,15,10,.18)}
 .poza .play svg{width:54px;height:54px;color:#fff;filter:drop-shadow(0 4px 10px rgba(0,0,0,.4))}
