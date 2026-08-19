@@ -697,7 +697,25 @@
     chips.forEach(function (c) { c.addEventListener('click', function () { var s = c.getAttribute('data-sort'); if (s === sortare) return; sortare = s; chips.forEach(function (x) { x.classList.remove('activ'); }); c.classList.add('activ'); reseteaza(); incarcaPagina(); }); });
 
     new IntersectionObserver(function (e) { if (e[0].isIntersecting) incarcaPagina(); }, { rootMargin: '600px' }).observe(sentinela);
-    incarcaPagina();
+
+    /* Venit de pe banda de pe prima pagină: adresa poartă „#m123", adică
+       „deschide-mi momentul acesta". Aici are voie să pornească filmul —
+       pe prima pagină nu, ca să nu tragă nimic nimeni degeaba.
+       Îl deschidem după ce s-a încărcat prima pagină de momente; banda
+       arată cele mai noi, deci sunt toate acolo. */
+    function deschideDinAdresa() {
+      var m = /^#m(\d+)$/.exec(location.hash || '');
+      if (!m) return;
+      var id = parseInt(m[1], 10);
+      for (var i = 0; i < toate.length; i++) {
+        if (toate[i].id === id) { deschideLightbox(i); break; }
+      }
+      /* Curățăm adresa: dacă închide și reîncarcă pagina, nu vrem să-i
+         sară din nou același fișier în față. */
+      if (history.replaceState) history.replaceState(null, '', location.pathname + location.search);
+    }
+
+    incarcaPagina().then(deschideDinAdresa);
 
     /* ---- lightbox ---- */
     var lb = document.getElementById('lightbox'), lbCont = document.getElementById('lb-continut'), lbCap = document.getElementById('lb-caption'), lbDl = document.getElementById('lb-download');

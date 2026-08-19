@@ -4,19 +4,19 @@ asigura_schema();
 
 $pozeRecente  = [];
 $urariRecente = [];
-/* Fâșia de pe prima pagină vrea 9 momente. Cerem mai multe și le punem
-   întâi pe cele care au miniatură: un film fără miniatură se afișează
-   arătând chiar filmul, iar filmul are zeci de MB. Un singur asemenea
-   fișier ține prima pagină în „se încarcă" pe date mobile. Aproape toate
-   au miniatură (o face telefonul la trimitere), deci de obicei fâșia iese
-   la fel — doar că fără surpriza aceea. */
+/* Banda care se rotește pe prima pagină. Cerem mai multe momente decât
+   arătăm și le punem întâi pe cele cu miniatură: o miniatură are ~55 KB,
+   iar originalul unei poze de telefon are peste un megaoctet. Filmele
+   intră și ele, dar NUMAI ca miniatură — niciun element de film pe prima
+   pagină, ca nimic să nu pornească singur și să nu tragă zeci de MB. */
+define('BANDA_MOMENTE', 14);
 try {
-    $candidati = db()->query("SELECT * FROM poze WHERE aprobat = 1 ORDER BY data_incarcare DESC, id DESC LIMIT 30")->fetchAll();
+    $candidati = db()->query("SELECT * FROM poze WHERE aprobat = 1 ORDER BY data_incarcare DESC, id DESC LIMIT 40")->fetchAll();
     $cuMiniatura = []; $faraMiniatura = [];
     foreach ($candidati as $c) {
         if (are_miniatura($c)) $cuMiniatura[] = $c; else $faraMiniatura[] = $c;
     }
-    $pozeRecente = array_slice(array_merge($cuMiniatura, $faraMiniatura), 0, 9);
+    $pozeRecente = array_slice(array_merge($cuMiniatura, $faraMiniatura), 0, BANDA_MOMENTE);
 } catch (Throwable $e) {}
 try { $urariRecente = db()->query("SELECT nume, mesaj, data_creare FROM urari WHERE aprobat = 1 ORDER BY data_creare DESC, id DESC LIMIT 6")->fetchAll(); } catch (Throwable $e) {}
 
@@ -109,21 +109,42 @@ cap_pagina('Acasă', 'acasa');
       <div class="ornament"><span class="ln"></span><span class="dot"></span><span class="ln r"></span></div>
       <h2 style="font-size:clamp(1.7rem,4vw,2.3rem)"><?= h(text('tx_recente_titlu')) ?></h2>
     </div>
-    <div class="galerie">
-      <?php foreach ($pozeRecente as $p): ?>
-        <a class="poza vizibil" href="galerie" aria-label="Vezi galeria">
-          <?php if ($p['tip'] === 'video' && !are_miniatura($p)): ?>
-            <?php /* Fără cadrul trimis de telefon nu există miniatură; arătăm
-                     chiar filmul, cerut doar cât să se vadă primul cadru. */ ?>
-            <video src="<?= h(url_original($p)) ?>#t=0.1" preload="metadata" muted playsinline tabindex="-1"></video>
-          <?php else: ?>
-            <img loading="lazy" src="<?= h(url_previzualizare($p)) ?>" alt="">
-          <?php endif; ?>
-          <?php if ($p['tip'] === 'video'): ?><div class="play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div><?php endif; ?>
-        </a>
-      <?php endforeach; ?>
+    <?php
+      /* Banda merge la nesfârșit pentru că lista e scrisă de două ori, iar
+         animația mută pista exact cu o jumătate din ea. Când ajunge acolo,
+         a doua copie stă fix unde stătea prima — se reia fără nicio
+         săritură. Durata crește cu numărul de momente, ca viteza să pară
+         aceeași fie că sunt 4 poze, fie 14. */
+      $durata = max(20, count($pozeRecente) * 4);
+    ?>
+    <div class="banda" aria-label="Cele mai noi momente din album">
+      <div class="banda-pista" style="animation-duration:<?= (int)$durata ?>s">
+        <?php for ($copie = 0; $copie < 2; $copie++): ?>
+          <?php foreach ($pozeRecente as $p): ?>
+            <?php /* Legătura duce la momentul ANUME, nu doar la galerie:
+                     apeși pe un film și se deschide chiar el, acolo unde
+                     are voie să pornească. */ ?>
+            <a class="banda-item" href="galerie#m<?= (int)$p['id'] ?>"
+               <?= $copie ? 'aria-hidden="true" tabindex="-1"' : 'aria-label="' . ($p['tip'] === 'video' ? 'Vezi filmul în galerie' : 'Vezi fotografia în galerie') . '"' ?>>
+              <?php if (are_miniatura($p)): ?>
+                <img loading="lazy" decoding="async" src="<?= h(url_previzualizare($p)) ?>" alt="">
+              <?php else: ?>
+                <?php /* Fără miniatură nu punem originalul aici: pe o poză
+                         de telefon ar fi peste un megaoctet, iar la un film
+                         zeci. Rămâne un loc gol, discret. */ ?>
+                <span class="banda-gol" aria-hidden="true"></span>
+              <?php endif; ?>
+              <?php if ($p['tip'] === 'video'): ?>
+                <span class="banda-play" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M8 5v14l11-7z"/></svg>
+                </span>
+              <?php endif; ?>
+            </a>
+          <?php endforeach; ?>
+        <?php endfor; ?>
+      </div>
     </div>
-    <div style="text-align:center;margin-top:20px"><a class="btn btn-ghost" href="galerie">Vezi toată galeria</a></div>
+    <div style="text-align:center;margin-top:22px"><a class="btn btn-ghost" href="galerie">Vezi toată galeria</a></div>
   </div>
 </section>
 <?php endif; ?>
