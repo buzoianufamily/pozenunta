@@ -47,7 +47,11 @@
       return '<video class="mini-video" src="' + esc(p.original) + '#t=0.1"'
            + ' preload="metadata" muted playsinline tabindex="-1"></video>';
     }
-    return '<img loading="lazy" src="' + esc(p.preview) + '" alt="' + textAlternativ + '">';
+    /* „onerror": o miniatură care nu ajunge — sau care lipsește de pe disc —
+       lăsa placa turtită la douăzeci de puncte, iar galeria părea goală.
+       Marcăm placa și CSS-ul îi dă o formă normală, cu un semn discret. */
+    return '<img loading="lazy" src="' + esc(p.preview) + '" alt="' + textAlternativ + '"'
+         + ' onerror="this.closest(\'.poza\').classList.add(\'fara-imagine\');this.remove()">';
   }
 
   /* Serverul e sursa de adevăr: ține aprecierile pe invitat, nu pe
@@ -681,12 +685,30 @@
       poze.forEach(function (p) {
         var idx = toate.length; toate.push(p);
         var div = document.createElement('div'); div.className = 'poza'; div.setAttribute('data-idx', idx); div.setAttribute('data-id', p.id);
+        /* Placa era un simplu chenar cu o apăsare pusă pe el: cu degetul
+           mergea, dar de la tastatură nu se putea ajunge la ea deloc — deci
+           nu se putea deschide nicio poză fără ecran tactil sau maus.
+           Acum are rol de buton, intră în drumul cu Tab și se deschide și
+           cu Enter sau Space, ca orice buton. */
+        div.setAttribute('tabindex', '0');
+        div.setAttribute('role', 'button');
+        div.setAttribute('aria-label',
+          (p.tip === 'video' ? 'Vezi filmul' : 'Vezi fotografia') +
+          (p.nume ? ' de la ' + p.nume : ''));
         var inner = previzualizare(p, esc(p.nume || 'Fotografie de nuntă'));
         if (p.tip === 'video') inner += '<div class="play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>';
         inner += '<button class="inima' + (esteApreciat(p.id) ? ' activ' : '') + '" data-like="' + p.id + '" aria-label="Apreciază">' + inimaSVG() + '<span>' + p.aprecieri + '</span></button>';
         if (p.nume || p.mesaj) inner += '<div class="pe-poza">' + (p.nume ? '<div class="nume">' + esc(p.nume) + '</div>' : '') + (p.mesaj ? '<div class="ms">' + esc(p.mesaj.length > 90 ? p.mesaj.slice(0, 90) + '…' : p.mesaj) + '</div>' : '') + '</div>';
         div.innerHTML = inner;
-        div.addEventListener('click', function (e) { if (e.target.closest('.inima')) return; deschideLightbox(parseInt(div.getAttribute('data-idx'), 10)); });
+        function deschideDeAici(e) { if (e.target.closest('.inima')) return; deschideLightbox(parseInt(div.getAttribute('data-idx'), 10)); }
+        div.addEventListener('click', deschideDeAici);
+        /* Enter și Space, ca la orice buton. Space ar derula pagina, deci
+           îl oprim doar aici. */
+        div.addEventListener('keydown', function (e) {
+          if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+          if (e.target.closest('.inima')) return;
+          e.preventDefault(); deschideDeAici(e);
+        });
         var bInima = div.querySelector('.inima');
         bInima.addEventListener('click', function (e) { e.stopPropagation(); comutaLike(p.id); });
         galerieEl.appendChild(div); revealObs.observe(div);
@@ -848,6 +870,24 @@
       lbCont.innerHTML = p.tip === 'video'
         ? '<video class="lb-media" src="' + esc(p.original) + '" controls autoplay playsinline></video>'
         : '<img class="lb-media" src="' + esc(p.original) + '" alt="">';
+
+      /* Poza mare nu ajunge — pe wi-fi-ul sălii, un fișier de un megaoctet
+         și jumătate poate pica. Fără asta, invitatul apăsa pe o poză și
+         primea un ecran negru, fără un cuvânt. */
+      if (p.tip !== 'video') {
+        lbCont.querySelector('img').addEventListener('error', function () {
+          if (lbIdActual !== p.id) return;
+          lbCont.innerHTML =
+            '<div class="lb-neredabil">' +
+              '<svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M12 8v5"/><path d="M12 16.5v.01"/><circle cx="12" cy="12" r="9"/></svg>' +
+              '<div class="titlu">Fotografia nu s-a putut încărca</div>' +
+              '<p>Probabil a fost o clipă de conexiune proastă.</p>' +
+              '<button type="button" class="btn btn-primar" id="lb-reincarca">Încearcă din nou</button>' +
+            '</div>';
+          var b = document.getElementById('lb-reincarca');
+          if (b) b.addEventListener('click', function () { randeaza(idxCurent); });
+        });
+      }
 
       /* Un iPhone care filmează în 4K scoate un .mov pe care telefoanele
          Android și multe calculatoare nu îl pot deschide. Miniatura din
