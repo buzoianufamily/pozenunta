@@ -136,7 +136,6 @@ img{max-width:100%;display:block}
 .dropzone .icon{width:56px;height:56px;margin:0 auto 14px;color:var(--accent)}
 .dropzone .titlu{font-family:var(--serif);font-size:1.6rem;color:var(--ink);margin-bottom:4px}
 .dropzone .desc{color:var(--muted);font-size:.92rem}
-.dropzone .formate{margin-top:10px;font-size:.78rem;color:var(--muted);letter-spacing:.04em}
 
 .campuri{margin-top:18px;display:grid;gap:14px}
 .camp label{display:block;font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px}
@@ -537,13 +536,18 @@ a.poza:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
   mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent);
 }
 .banda-pista{
-  display:flex;flex-wrap:nowrap;gap:14px;width:max-content;
+  --gap:14px;
+  display:flex;flex-wrap:nowrap;gap:var(--gap);width:max-content;
   animation-name:banda-curge;animation-timing-function:linear;animation-iteration-count:infinite;
   will-change:transform;
 }
+/* Mutarea e o jumătate de pistă PLUS o jumătate de spațiu — atunci a doua
+   copie cade exact peste prima. Spațiul e o variabilă, ca aceeași animație
+   să se potrivească și benzii cu poze, și celei cu urări, care au
+   distanțe diferite între ele. */
 @keyframes banda-curge{
   from{transform:translateX(0)}
-  to  {transform:translateX(calc(-50% - 7px))}   /* 7px = jumătate din gap */
+  to  {transform:translateX(calc(-50% - var(--gap) / 2))}
 }
 /* Pe calculator se oprește sub mouse, ca să te poți uita la o poză. */
 @media (hover: hover){
@@ -568,8 +572,7 @@ a.poza:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 }
 @media (max-width:680px){
   .banda-item{width:150px;height:106px;border-radius:12px}
-  .banda-pista{gap:10px}
-  @keyframes banda-curge{from{transform:translateX(0)}to{transform:translateX(calc(-50% - 5px))}}
+  .banda-pista{--gap:10px}
   .banda-play{width:26px;height:26px;right:6px;bottom:6px}
   .banda-play svg{width:17px;height:17px}
 }
@@ -578,6 +581,43 @@ a.poza:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 @media (prefers-reduced-motion: reduce){
   .banda{overflow-x:auto;-webkit-overflow-scrolling:touch}
   .banda-pista{animation:none}
+}
+
+/* ------------------------------------------------------------
+   BANDA CU URĂRI
+   Aceeași mecanică, alt conținut: cartonașe cu text în loc de
+   poze. Trebuie să fie de aceeași înălțime, altfel linia se
+   strâmbă — iar urările au lungimi foarte diferite. Textul se
+   taie la câteva rânduri și se termină cu trei puncte.
+   ------------------------------------------------------------ */
+.banda-urari .banda-pista{--gap:16px}
+.urare-placa{
+  position:relative;flex:0 0 auto;display:flex;flex-direction:column;justify-content:space-between;
+  width:300px;height:172px;padding:20px 22px;border-radius:var(--radius-sm);
+  background:var(--card);border:1px solid var(--line-soft);box-shadow:var(--shadow-sm);
+  color:var(--ink);overflow:hidden;
+}
+/* O urare de două cuvinte lăsa un gol mare deasupra semnăturii. Corpul
+   ocupă locul rămas și își așază textul la mijloc: cele scurte stau
+   centrat, cele lungi îl umplu oricum. */
+.urare-corp{flex:1 1 auto;display:flex;align-items:center;min-height:0}
+.urare-placa .urare-text{
+  font-family:var(--serif);font-size:1.06rem;line-height:1.45;color:var(--ink);
+  display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;
+}
+.urare-placa .urare-semn{
+  display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  border-top:1px solid var(--line-soft);padding-top:9px;margin-top:10px;
+  font-family:var(--serif);font-style:italic;font-size:1rem;color:var(--green);
+}
+.urare-placa .urare-data{font-family:var(--sans);font-style:normal;font-size:.7rem;
+  letter-spacing:.1em;color:var(--muted);flex:none}
+.urare-placa .nume{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+@media (max-width:680px){
+  .banda-urari .banda-pista{--gap:12px}
+  .urare-placa{width:250px;height:158px;padding:16px 18px}
+  .urare-placa .urare-text{font-size:1rem;-webkit-line-clamp:4}
 }
 
 /* --- Carte de urări --- */
