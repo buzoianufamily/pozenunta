@@ -43,10 +43,15 @@
      pentru că nu se afișează nimic. Punem chiar filmul, cerut doar cât
      să se vadă primul cadru: „#t=0.1" îi spune browserului de unde. */
   function previzualizare(p, textAlternativ) {
-    if (p.tip === 'video' && p.miniatura === false) {
-      return '<video class="mini-video" src="' + esc(p.original) + '#t=0.1"'
-           + ' preload="metadata" muted playsinline tabindex="-1"></video>';
-    }
+    /* Un film fără miniatură stătea aici ca <video preload="metadata">,
+       ca să se vadă măcar primul cadru. Prețul era prea mare: telefonul
+       ține doar câteva filme deodată, iar fiecare astfel de placă mușca
+       din plafon chiar dacă nimeni nu o apăsa — destule la un loc și nu
+       mai pornea NICIUN film din galerie. Acum placa rămâne goală, cu
+       semnul ei discret și cu triunghiul de pornire deasupra; filmul se
+       deschide la fel de bine. Ca să se vadă și cadrul, se apasă
+       „generează miniaturile" din panou. */
+    if (p.tip === 'video' && p.miniatura === false) return '';
     /* „onerror": o miniatură care nu ajunge — sau care lipsește de pe disc —
        lăsa placa turtită la douăzeci de puncte, iar galeria părea goală.
        Marcăm placa și CSS-ul îi dă o formă normală, cu un semn discret. */
@@ -132,7 +137,22 @@
         var v = document.createElement('video');
         v.muted = true; v.playsInline = true; v.preload = 'metadata'; v.src = url;
         var gata = false;
-        function termina(blob) { if (gata) return; gata = true; try { URL.revokeObjectURL(url); } catch (e) {} resolve(blob); }
+        /* Nu e destul să dăm drumul adresei: elementul <video> rămâne cu
+           fișierul prins, iar telefonul suportă doar câteva filme ținute
+           deodată. Invitatul care urcă cinci filme ajungea în galerie cu
+           plafonul deja mâncat, deși pe pagina de încărcare nu se vedea
+           nimic. Îl oprim și îi cerem „load()", ca la vizualizator.
+           (Panoul de administrare face asta de la bun început.) */
+        function elibereaza() {
+          try { v.pause(); } catch (e) {}
+          try { v.removeAttribute('src'); v.load(); } catch (e) {}
+        }
+        function termina(blob) {
+          if (gata) return; gata = true;
+          elibereaza();
+          try { URL.revokeObjectURL(url); } catch (e) {}
+          resolve(blob);
+        }
         v.addEventListener('loadeddata', function () {
           /* Pe iPhone, un film care n-a rulat niciodată se desenează pe
              pânză ca un dreptunghi negru: decodorul nu are încă un cadru.
@@ -310,8 +330,14 @@
     function rowFor(item, previewBlob) {
       var rand = document.createElement('div'); rand.className = 'fisier-rand';
       var miniHtml;
+      var urlMini = null;
       if (!item.isVideo && previewBlob && /^image\/(jpeg|png|gif|webp|bmp)$/i.test(previewBlob.type || '')) {
-        miniHtml = '<img class="mini" src="' + URL.createObjectURL(previewBlob) + '" alt="">';
+        /* Adresa asta ține poza în memoria telefonului până la
+           reîncărcarea paginii. Cine alege treizeci de poze deodată le
+           ținea pe toate. O eliberăm de îndată ce imaginea s-a desenat —
+           browserul păstrează ce a desenat deja. */
+        urlMini = URL.createObjectURL(previewBlob);
+        miniHtml = '<img class="mini" src="' + urlMini + '" alt="">';
       } else {
         miniHtml = '<div class="mini" style="display:flex;align-items:center;justify-content:center;color:#BF9B4F">' +
           (item.isVideo
@@ -323,6 +349,14 @@
         '<div class="stare" role="status">În așteptare</div>' +
         '<div class="bara" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"' +
         ' aria-label="Progres încărcare ' + esc(item.name) + '"><i></i></div></div>';
+      if (urlMini) {
+        var imgMini = rand.querySelector('img.mini');
+        if (imgMini) {
+          var scapa = function () { try { URL.revokeObjectURL(urlMini); } catch (e) {} };
+          imgMini.addEventListener('load', scapa);
+          imgMini.addEventListener('error', scapa);
+        }
+      }
       item.row = rand;
       return rand;
     }
@@ -696,6 +730,10 @@
           (p.tip === 'video' ? 'Vezi filmul' : 'Vezi fotografia') +
           (p.nume ? ' de la ' + p.nume : ''));
         var inner = previzualizare(p, esc(p.nume || 'Fotografie de nuntă'));
+        /* Fără miniatură nu intră nicio imagine în placă; îi dăm forma și
+           semnul discret pe care le are deja placa cu poza lipsă, ca să nu
+           rămână turtită. */
+        if (p.tip === 'video' && p.miniatura === false) div.classList.add('fara-imagine');
         if (p.tip === 'video') inner += '<div class="play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>';
         inner += '<button class="inima' + (esteApreciat(p.id) ? ' activ' : '') + '" data-like="' + p.id + '" aria-label="Apreciază">' + inimaSVG() + '<span>' + p.aprecieri + '</span></button>';
         if (p.nume || p.mesaj) inner += '<div class="pe-poza">' + (p.nume ? '<div class="nume">' + esc(p.nume) + '</div>' : '') + (p.mesaj ? '<div class="ms">' + esc(p.mesaj.length > 90 ? p.mesaj.slice(0, 90) + '…' : p.mesaj) + '</div>' : '') + '</div>';
