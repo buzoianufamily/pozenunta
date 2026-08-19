@@ -435,6 +435,14 @@ a.poza:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
    poziționate exact ca înainte. */
 .lb-bara{display:contents}
 
+/* Ce se arată când browserul nu poate deschide filmul (de obicei .mov
+   filmat cu iPhone-ul, deschis pe Android). */
+.lb-neredabil{max-width:min(92vw,420px);text-align:center;color:#f3ece0;padding:26px 22px;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:var(--radius)}
+.lb-neredabil svg{color:#d9c9a6;margin-bottom:10px}
+.lb-neredabil .titlu{font-family:var(--serif);font-size:1.35rem;color:#fff;margin-bottom:6px}
+.lb-neredabil p{font-size:.9rem;line-height:1.5;color:#ddd2bf;margin:0 0 18px}
+
 /* ============================================================
    LIGHTBOX PE TELEFON
    ------------------------------------------------------------

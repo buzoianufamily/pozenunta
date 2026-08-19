@@ -734,6 +734,27 @@
       lbCont.innerHTML = p.tip === 'video'
         ? '<video class="lb-media" src="' + esc(p.original) + '" controls autoplay playsinline></video>'
         : '<img class="lb-media" src="' + esc(p.original) + '" alt="">';
+
+      /* Un iPhone care filmează în 4K scoate un .mov pe care telefoanele
+         Android și multe calculatoare nu îl pot deschide. Miniatura din
+         grilă e făcută chiar de telefonul care a filmat, deci fișierul
+         arată normal — iar la apăsare invitatul primea un dreptunghi
+         negru, fără un cuvânt. Serverul nu poate schimba formatul, dar
+         măcar spunem ce se întâmplă și dăm filmul la descărcat, unde
+         aplicația telefonului îl deschide fără probleme. */
+      if (p.tip === 'video') {
+        lbCont.querySelector('video').addEventListener('error', function () {
+          if (lbIdActual !== p.id) return;          // între timp a trecut mai departe
+          lbCont.innerHTML =
+            '<div class="lb-neredabil">' +
+              '<svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M12 8v5"/><path d="M12 16.5v.01"/><circle cx="12" cy="12" r="9"/></svg>' +
+              '<div class="titlu">Filmul nu se poate reda aici</div>' +
+              '<p>A fost filmat într-un format pe care acest telefon nu îl deschide în pagină. ' +
+              'Descarcă-l și îl vezi în aplicația ta de filme.</p>' +
+              '<a class="btn btn-primar" href="' + esc(p.original) + '" download="' + esc(numeDescarcare(p)) + '">Descarcă filmul</a>' +
+            '</div>';
+        });
+      }
       var cap = '';
       if (p.nume) cap += '<div class="nume">' + esc(p.nume) + '</div>';
       if (p.mesaj) cap += '<div class="mesaj">' + esc(p.mesaj) + '</div>';
