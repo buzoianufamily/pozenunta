@@ -7,6 +7,13 @@
 (function () {
   'use strict';
 
+  /* Semnul că fișierul acesta a ajuns și a pornit. Pagina îl caută după
+     câteva secunde: dacă lipsește, înseamnă că nu s-a încărcat (o pană
+     scurtă de rețea exact atunci) — iar atunci zona de încărcare arată
+     bine, dar nu face nimic. Fără semnul ăsta, invitatul n-ar avea de
+     unde ști de ce nu merge. */
+  window.NUNTA_PORNIT = true;
+
   /* ---------- utilitare ---------- */
   var toastEl = document.getElementById('toast'), toastTimer;
   function toast(msg) {
@@ -720,14 +727,39 @@
       if (lbIdActual === id) { lbLikeN.textContent = p.aprecieri; lbLike.classList.toggle('activ', liked); }
     }
 
+    /* O cerere ratată NU înseamnă că albumul s-a terminat.
+       Înainte, o singură pană de rețea în timpul derulării oprea galeria
+       pentru totdeauna: invitatul vedea șaizeci de momente, fără niciun
+       semn, și credea că ăsta e tot albumul — iar când revenea rețeaua,
+       nu se relua nimic până la reîncărcarea paginii. */
+    var reincercare = false;
+
+    function aratEsec() {
+      reincercare = true;
+      miniLoader.style.display = 'block';
+      miniLoader.innerHTML = 'Nu s-au putut aduce momentele următoare. ' +
+        '<button type="button" class="btn btn-ghost btn-mic" id="btn-mai-multe" style="margin-left:8px">Încearcă din nou</button>';
+      var b = document.getElementById('btn-mai-multe');
+      if (b) b.addEventListener('click', function () { incarcaPagina(); });
+    }
+
     function incarcaPagina() {
       if (seIncarca || !maiSunt) return Promise.resolve();
-      seIncarca = true; miniLoader.style.display = 'block';
+      seIncarca = true;
+      if (reincercare) { reincercare = false; miniLoader.textContent = 'Se încarcă…'; }
+      miniLoader.style.display = 'block';
+      var esuat = false;
       return fetch('api.php?actiune=lista&sortare=' + sortare + '&pagina=' + (pagina + 1))
-        .then(function (r) { return r.json(); })
+        .then(function (r) { if (!r.ok) throw new Error('raspuns ' + r.status); return r.json(); })
         .then(function (d) { if (d && d.ok) { pagina = d.pagina; if (d.poze.length) { niciUna = false; sincronizeazaLike(d.poze); adaugaPoze(d.poze); } maiSunt = d.maiSunt; } else { maiSunt = false; } })
-        .catch(function () { maiSunt = false; })
-        .finally(function () { seIncarca = false; miniLoader.style.display = 'none'; if (niciUna) golEl.style.display = 'block'; if (maiSunt && document.body.scrollHeight <= window.innerHeight + 200) incarcaPagina(); });
+        .catch(function () { esuat = true; })
+        .finally(function () {
+          seIncarca = false;
+          if (esuat) { aratEsec(); return; }        // „maiSunt" rămâne, deci se poate relua
+          miniLoader.style.display = 'none';
+          if (niciUna) golEl.style.display = 'block';
+          if (maiSunt && document.body.scrollHeight <= window.innerHeight + 200) incarcaPagina();
+        });
     }
 
     function reseteaza() { pagina = 0; seIncarca = false; maiSunt = true; niciUna = true; toate = []; galerieEl.innerHTML = ''; golEl.style.display = 'none'; }

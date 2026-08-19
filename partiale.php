@@ -75,6 +75,40 @@ function subsol_pagina(): void {
 </footer>
 <div class="toast" id="toast"></div>
 <script src="assets/app.js?v=<?= @filemtime(__DIR__ . '/assets/app.js') ?>"></script>
+<?php /* Plasă pentru cazul în care fișierul de mai sus nu ajunge: pe rețeaua
+         unei săli se poate întâmpla. Fără el, chenarul de încărcare și
+         galeria arată normal, dar nu fac nimic — iar invitatul renunță fără
+         să înțeleagă de ce. Mesajul apare DOAR dacă lipsește semnul că
+         fișierul a pornit, deci pe drumul bun nu se vede niciodată. */ ?>
+<script>
+(function () {
+  function anunta() {
+    if (window.NUNTA_PORNIT) return;
+    var zona = document.getElementById('zona-upload') || document.getElementById('galerie');
+    if (!zona || document.getElementById('nunta-neincarcat')) return;
+    var d = document.createElement('div');
+    d.id = 'nunta-neincarcat';
+    d.className = 'alerta';
+    d.style.margin = '0 0 18px';
+    d.innerHTML = '<strong>Pagina nu s-a încărcat până la capăt.</strong><br>' +
+      'Din cauza asta încărcarea nu funcționează. Reîncarcă pagina — de obicei e de ajuns.' +
+      '<br><br><button type="button" class="btn btn-primar btn-mic" ' +
+      'onclick="location.reload()">Reîncarcă pagina</button>';
+    zona.parentNode.insertBefore(d, zona);
+    var g = document.getElementById('incarcare-mini');
+    if (g) g.style.display = 'none';
+  }
+  if (document.readyState === 'complete') setTimeout(anunta, 6000);
+  else window.addEventListener('load', function () { setTimeout(anunta, 6000); });
+})();
+</script>
+<noscript>
+  <div class="alerta" style="margin:18px auto;max-width:680px">
+    <strong>JavaScript e oprit în browserul tău.</strong><br>
+    Poți citi urările și vedea pagina, dar pentru a încărca poze sau a vedea
+    galeria e nevoie să îl pornești din setările browserului.
+  </div>
+</noscript>
 </body>
 </html>
 <?php

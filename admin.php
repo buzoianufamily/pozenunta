@@ -465,11 +465,16 @@ $poze = $stmt->fetchAll();
             <?php $prev = url_previzualizare($p); $orig = url_original($p); ?>
             <div class="admin-poza" data-id="<?= (int)$p['id'] ?>">
               <a href="<?= h($orig) ?>" target="_blank">
-                <?php if ($p['tip'] === 'video'): ?>
+                <?php if ($p['tip'] === 'video' && !are_miniatura($p)): ?>
+                  <?php /* Doar filmele fără miniatură se arată ca film. Înainte
+                           se arătau toate așa, iar panoul cu o sută de filme
+                           cerea metadate pentru toate o sută — în loc de o sută
+                           de miniaturi de 55 KB. */ ?>
                   <video src="<?= h($orig) ?>#t=0.1" preload="metadata" muted></video>
                   <span class="badge video">video</span>
                 <?php else: ?>
                   <img loading="lazy" src="<?= h($prev) ?>" alt="">
+                  <?php if ($p['tip'] === 'video'): ?><span class="badge video">video</span><?php endif; ?>
                 <?php endif; ?>
               </a>
               <?php if ((int)$p['aprobat'] === 0): ?><span class="badge asteptare" style="<?= $p['tip']==='video'?'top:34px':'' ?>">în așteptare</span><?php endif; ?>
@@ -619,6 +624,22 @@ $poze = $stmt->fetchAll();
     var stare = document.getElementById('cadre-stare');
     var lista = JSON.parse(document.getElementById('filme-fara-cadru').textContent || '[]');
 
+    /* Aceeasi verificare pe care o face si telefonul invitatului la
+       incarcare: un cadru complet negru nu e o miniatura, e o pata — iar
+       serverul l-ar lua drept miniatura buna si n-ar mai incerca nimic.
+       Lipsea aici, deci panoul putea salva exact ce telefonul refuza. */
+    function cadruGol(ctx, w, h){
+      try {
+        var pasX = Math.max(1, Math.floor(w/8)), pasY = Math.max(1, Math.floor(h/8)), maxim = 0;
+        for (var x=0; x<w; x+=pasX) for (var y=0; y<h; y+=pasY){
+          var p = ctx.getImageData(x,y,1,1).data;
+          var lum = 0.299*p[0] + 0.587*p[1] + 0.114*p[2];
+          if (lum > maxim) maxim = lum;
+        }
+        return maxim < 12;
+      } catch(e){ return false; }
+    }
+
     function cadruDin(url){
       return new Promise(function(res){
         var v = document.createElement('video');
@@ -640,7 +661,9 @@ $poze = $stmt->fetchAll();
             var s = Math.min(1, 700/Math.max(w,h));
             var c = document.createElement('canvas');
             c.width = Math.round(w*s); c.height = Math.round(h*s);
-            c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+            var ctx = c.getContext('2d');
+            ctx.drawImage(v, 0, 0, c.width, c.height);
+            if (cadruGol(ctx, c.width, c.height)) { termina(null); return; }
             c.toBlob(function(b){ termina(b); }, 'image/jpeg', 0.82);
           } catch(e){ termina(null); }
         });
@@ -649,18 +672,46 @@ $poze = $stmt->fetchAll();
       });
     }
 
-    var reusite = 0, esecuri = 0, i = 0, pornit = false;
+    var reusite = 0, esecuri = 0, i = 0;
 
     /* Cate se fac de la sine, fara sa intrebe. Un film adus pe date mobile
        costa; cateva nu se simt, zece da. Peste atat, intrebam. */
     var SINGUR = 3;
 
-    function lucreaza(pana){
-      pornit = true; btnCadre.disabled = true;
+    /* Filmele pe care browserul asta nu le-a putut deschide. Fara memoria
+       lor, pornirea automata le lua de la capat la FIECARE deschidere a
+       panoului si le descarca din nou degeaba — la un .mov de o suta de
+       megaocteti, de zece ori inseamna un gigaoctet aruncat. Le tinem minte
+       si le sarim cand pornim singuri; apasarea pe buton le incearca
+       oricum, ca poate ai deschis panoul de pe alt aparat. */
+    var CHEIE_ESEC = 'nunta_cadre_esuate';
+    function esuate(){ try { return JSON.parse(localStorage.getItem(CHEIE_ESEC) || '[]'); } catch(e){ return []; } }
+    function tineMinteEsec(id){
+      try { var l = esuate(); if (l.indexOf(id) < 0) { l.push(id);
+        localStorage.setItem(CHEIE_ESEC, JSON.stringify(l.slice(-500))); } } catch(e){}
+    }
+    function uitaEsecurile(){ try { localStorage.removeItem(CHEIE_ESEC); } catch(e){} }
+
+    function lucreaza(pana, sariPesteEsecuri){
+      btnCadre.disabled = true;
+      var stiuteRele = sariPesteEsecuri ? esuate() : [];
       (function urmatorul(){
+        /* Sarim peste cele despre care stim deja ca nu se deschid aici. */
+        while (sariPesteEsecuri && i < lista.length && stiuteRele.indexOf(lista[i].id) >= 0) i++;
+
         if (i >= lista.length){
-          stare.textContent = reusite + ' gata' + (esecuri ? ', ' + esecuri + ' nu s-au putut deschide aici' : '') + '. Reîncarcă pagina.';
-          btnCadre.style.display = 'none'; return;
+          if (reusite === 0 && esecuri === 0){
+            stare.textContent = 'Cele ' + lista.length + ' rămase nu s-au putut deschide în acest browser. '
+              + 'Încearcă de pe iPhone, sau apasă ca să reîncerci aici.';
+            btnCadre.textContent = 'Încearcă din nou';
+          } else if (reusite === 0){
+            stare.textContent = 'Niciunul nu s-a putut deschide în acest browser. Încearcă de pe iPhone — el citește formatele Apple.';
+            btnCadre.textContent = 'Încearcă din nou';
+          } else {
+            stare.textContent = reusite + ' gata' + (esecuri ? ', ' + esecuri + ' nu s-au putut deschide aici' : '') + '. Reîncarcă pagina.';
+            btnCadre.style.display = 'none';
+          }
+          btnCadre.disabled = false; return;
         }
         if (i >= pana){
           var ramase = lista.length - i;
@@ -671,21 +722,25 @@ $poze = $stmt->fetchAll();
         var f = lista[i++];
         stare.textContent = 'Se lucrează… ' + i + ' din ' + lista.length;
         cadruDin(f.url).then(function(blob){
-          if (!blob) { esecuri++; return urmatorul(); }
+          if (!blob) { esecuri++; tineMinteEsec(f.id); return urmatorul(); }
           var fd = new FormData();
           fd.append('csrf', CSRF); fd.append('ajax','1');
           fd.append('actiune','salveaza_poster'); fd.append('id', String(f.id));
           fd.append('cadru', blob, 'cadru.jpg');
           fetch('admin.php', { method:'POST', body: fd, credentials:'same-origin' })
             .then(function(r){ return r.json(); })
-            .then(function(d){ if (d && d.ok) reusite++; else esecuri++; })
-            .catch(function(){ esecuri++; })
+            .then(function(d){ if (d && d.ok) reusite++; else { esecuri++; tineMinteEsec(f.id); } })
+            .catch(function(){ esecuri++; tineMinteEsec(f.id); })
             .then(urmatorul);
         });
       })();
     }
 
-    btnCadre.addEventListener('click', function(){ lucreaza(lista.length); });
+    /* Apasarea e o cerere limpede: incearca tot, inclusiv ce a esuat inainte. */
+    btnCadre.addEventListener('click', function(){
+      uitaEsecurile(); i = 0; reusite = 0; esecuri = 0;
+      lucreaza(lista.length, false);
+    });
 
     /* Pornim singuri, discret, cat sa nu coste. Daca telefonul spune ca e
        pe date mobile sau ca vrea sa economiseasca, nu incepem — asteptam
@@ -695,7 +750,7 @@ $poze = $stmt->fetchAll();
     var economie = c && (c.saveData === true || c.type === 'cellular'
                    || c.effectiveType === 'slow-2g' || c.effectiveType === '2g' || c.effectiveType === '3g');
     if (!economie) {
-      lucreaza(Math.min(SINGUR, lista.length));
+      lucreaza(Math.min(SINGUR, lista.length), true);
     } else {
       stare.textContent = 'Ești pe date mobile — apasă când ești pe wi-fi.';
     }
