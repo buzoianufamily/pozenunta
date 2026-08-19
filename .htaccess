@@ -21,6 +21,12 @@ DirectoryIndex index.php
   RewriteRule ^(galerie|urari)/?$ $1.php [L]
 </IfModule>
 
+# Folderul „bin" (unde poți pune ffmpeg) nu se serveste niciodata prin web:
+# programul de acolo e pentru server, nu pentru vizitatori.
+<IfModule mod_rewrite.c>
+  RewriteRule ^bin/ - [F,L]
+</IfModule>
+
 # Nu permite accesul direct la fișiere sensibile
 <FilesMatch "(?i)(config\.php|functions\.php|partiale\.php)$">
   Require all denied

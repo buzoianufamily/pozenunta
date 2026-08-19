@@ -39,6 +39,10 @@ define('THUMB_WIDTH', 600);
 // Lățimea variantei mici a fotografiei de cuplu de pe prima pagină (px).
 // Rama ei are 520 de puncte, deci 1200 ajunge și pe ecranele fine.
 define('COVER_WIDTH', 1200);
+// Calea către ffmpeg, dacă știi unde e pe serverul tău. Lasă gol și îl
+// caută singur — inclusiv în „bin/ffmpeg" lângă site, unde îl poți urca tu.
+// Serveşte doar la miniatura filmelor cărora telefonul nu le-a putut face una.
+define('FFMPEG_CALE', '');
 // Câte poze se încarcă odată în galerie (scroll infinit).
 define('PER_PAGINA', 30);
 // Spațiul TOTAL al găzduirii, în GB (pentru indicatorul din panou). Mărește-l dacă cumperi spațiu suplimentar.
