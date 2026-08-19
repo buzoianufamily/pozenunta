@@ -91,7 +91,7 @@ function salveaza_setare(string $cheie, string $valoare): void {
 function texte_editabile(): array {
     return [
         /* ---------- meniul de sus (pe toate paginile) ---------- */
-        'tx_meniu_acasa'     => ['Meniu', 'Prima legătură (pagina de încărcare)', 'Încarcă poze sau clipuri', false],
+        'tx_meniu_acasa'     => ['Meniu', 'Prima legătură (pagina de încărcare)', 'Trimite o amintire', false],
         'tx_meniu_galerie'   => ['Meniu', 'A doua legătură (galeria)', 'Galerie', false],
         'tx_meniu_urari'     => ['Meniu', 'A treia legătură (cartea de urări)', 'Carte de urări', false],
 
