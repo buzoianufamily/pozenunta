@@ -54,6 +54,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($ajax) raspunde_json(['ok' => true, 'n' => $n]);
             $notif = ['ok', ($actiune === 'sterge_multe' ? "$n șterse." : "$n aprobate.")];
 
+        } elseif ($actiune === 'salveaza_poster') {
+            /* Cadrul vine din browserul tău: el are decodor video, PHP nu.
+               Îl primim ca imagine obișnuită și îl facem miniatură.
+               Doar pentru filmele care chiar n-au una — ca o apăsare
+               greșită să nu înlocuiască o miniatură bună. */
+            $idP = (int)($_POST['id'] ?? 0);
+            $raspuns = ['ok' => false];
+            if ($idP > 0 && !empty($_FILES['cadru']) && ($_FILES['cadru']['error'] ?? 1) === UPLOAD_ERR_OK
+                && is_uploaded_file($_FILES['cadru']['tmp_name'])) {
+                $s = $pdo->prepare("SELECT nume_fisier FROM poze WHERE id = ? AND tip = 'video'");
+                $s->execute([$idP]);
+                $nf = $s->fetchColumn();
+                if ($nf) {
+                    $dest = THUMB_DIR . $nf . '.jpg';
+                    if (is_file($dest)) {
+                        $raspuns = ['ok' => true, 'sarit' => true];
+                    } elseif (@creeaza_thumbnail($_FILES['cadru']['tmp_name'], $dest)) {
+                        @chmod($dest, 0644);
+                        $raspuns = ['ok' => true];
+                    }
+                }
+            }
+            raspunde_json($raspuns);
+
         } elseif ($actiune === 'comuta_moderare') {
             salveaza_setare('moderare', moderare_activa() ? '0' : '1');
             $notif = ['ok', 'Setare salvată.'];
@@ -137,6 +161,18 @@ try {
          ORDER BY aprobat ASC, data_creare DESC, id DESC LIMIT 200'
     )->fetchAll();
 } catch (Throwable $e) { /* tabela poate lipsi la prima rulare */ }
+/* Filmele rămase fără miniatură. De obicei cadrul îl trimite telefonul
+   care a filmat; când n-a putut, îl poate scoate browserul tău de aici —
+   el are decodor video, PHP nu are. */
+$filmeFaraCadru = [];
+try {
+    foreach ($pdo->query("SELECT id, nume_fisier FROM poze WHERE tip = 'video'")->fetchAll() as $f) {
+        if (!is_file(THUMB_DIR . $f['nume_fisier'] . '.jpg')) {
+            $filmeFaraCadru[] = ['id' => (int)$f['id'], 'url' => UPLOAD_URL . rawurlencode($f['nume_fisier'])];
+        }
+    }
+} catch (Throwable $e) {}
+
 $quotaBytes  = DISK_QUOTA_GB * 1024 * 1024 * 1024;
 $procentDisc = $quotaBytes > 0 ? min(100, (int)round($spatiu / $quotaBytes * 100)) : 0;
 $liberBytes  = max(0, $quotaBytes - $spatiu);
@@ -236,6 +272,26 @@ $poze = $stmt->fetchAll();
         <p class="ajutor" style="margin-top:10px">Ai folosit <?= $procentDisc ?>% din spațiu. Mai ai loc, dar urmărește filmele — ele ocupă cel mai mult.</p>
       <?php endif; ?>
     </div>
+
+    <?php if ($filmeFaraCadru): ?>
+    <!-- MINIATURI LIPSĂ LA FILME -->
+    <div class="panou">
+      <h2>Filme fără miniatură</h2>
+      <p class="ajutor">
+        <strong><?= count($filmeFaraCadru) ?></strong>
+        <?= count($filmeFaraCadru) === 1 ? 'film nu are miniatură' : 'filme nu au miniatură' ?>.
+        De obicei cadrul îl trimite telefonul care a filmat; când n-a putut, îl scoate browserul de aici.
+        Primele câteva se fac singure, de îndată ce deschizi panoul. Restul le ceri cu butonul,
+        pentru că filmele se descarcă pe dispozitivul tău cât durează — deci mai bine pe wi-fi.
+        Dacă unul nu poate fi deschis nici aici, încearcă de pe iPhone — el citește formatele Apple.
+      </p>
+      <div class="rand-form" style="gap:12px;align-items:center;margin-top:12px">
+        <button class="btn btn-primar btn-mic" id="btn-cadre">Fă-le pe toate</button>
+        <span class="sel-info" id="cadre-stare"></span>
+      </div>
+      <script type="application/json" id="filme-fara-cadru"><?= json_encode($filmeFaraCadru, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?></script>
+    </div>
+    <?php endif; ?>
 
     <!-- SETĂRI -->
     <div class="panou">
@@ -554,6 +610,97 @@ $poze = $stmt->fetchAll();
     document.getElementById('fa-ids').value = ids.join(',');
     document.getElementById('form-actiuni').submit();
   }
+  /* ---------- miniaturi pentru filmele care n-au ----------
+     Scoatem cadrul aici, in browser: el are decodor video, serverul nu.
+     Filmul se cere cu „metadata" si se sare la o secunda — de obicei
+     browserul aduce doar inceputul, nu tot filmul. */
+  var btnCadre = document.getElementById('btn-cadre');
+  if (btnCadre) (function(){
+    var stare = document.getElementById('cadre-stare');
+    var lista = JSON.parse(document.getElementById('filme-fara-cadru').textContent || '[]');
+
+    function cadruDin(url){
+      return new Promise(function(res){
+        var v = document.createElement('video');
+        v.muted = true; v.playsInline = true; v.preload = 'metadata'; v.crossOrigin = 'anonymous'; v.src = url;
+        var gata = false;
+        function termina(b){ if (gata) return; gata = true; try { v.src=''; v.load(); } catch(e){} res(b); }
+        v.addEventListener('loadeddata', function(){
+          var p = null; try { p = v.play(); } catch(e){}
+          Promise.resolve(p).catch(function(){}).then(function(){
+            try { v.pause(); } catch(e){}
+            var d = (v.duration && isFinite(v.duration)) ? v.duration : 2;
+            try { v.currentTime = Math.min(1, d/2); } catch(e){ termina(null); }
+          });
+        });
+        v.addEventListener('seeked', function(){
+          try {
+            var w = v.videoWidth, h = v.videoHeight;
+            if (!w || !h) { termina(null); return; }
+            var s = Math.min(1, 700/Math.max(w,h));
+            var c = document.createElement('canvas');
+            c.width = Math.round(w*s); c.height = Math.round(h*s);
+            c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+            c.toBlob(function(b){ termina(b); }, 'image/jpeg', 0.82);
+          } catch(e){ termina(null); }
+        });
+        v.addEventListener('error', function(){ termina(null); });
+        setTimeout(function(){ termina(null); }, 45000);
+      });
+    }
+
+    var reusite = 0, esecuri = 0, i = 0, pornit = false;
+
+    /* Cate se fac de la sine, fara sa intrebe. Un film adus pe date mobile
+       costa; cateva nu se simt, zece da. Peste atat, intrebam. */
+    var SINGUR = 3;
+
+    function lucreaza(pana){
+      pornit = true; btnCadre.disabled = true;
+      (function urmatorul(){
+        if (i >= lista.length){
+          stare.textContent = reusite + ' gata' + (esecuri ? ', ' + esecuri + ' nu s-au putut deschide aici' : '') + '. Reîncarcă pagina.';
+          btnCadre.style.display = 'none'; return;
+        }
+        if (i >= pana){
+          var ramase = lista.length - i;
+          stare.textContent = reusite + ' gata. Mai sunt ' + ramase + '.';
+          btnCadre.textContent = 'Continuă cu ' + (ramase === 1 ? 'ultimul' : 'restul de ' + ramase);
+          btnCadre.disabled = false; return;
+        }
+        var f = lista[i++];
+        stare.textContent = 'Se lucrează… ' + i + ' din ' + lista.length;
+        cadruDin(f.url).then(function(blob){
+          if (!blob) { esecuri++; return urmatorul(); }
+          var fd = new FormData();
+          fd.append('csrf', CSRF); fd.append('ajax','1');
+          fd.append('actiune','salveaza_poster'); fd.append('id', String(f.id));
+          fd.append('cadru', blob, 'cadru.jpg');
+          fetch('admin.php', { method:'POST', body: fd, credentials:'same-origin' })
+            .then(function(r){ return r.json(); })
+            .then(function(d){ if (d && d.ok) reusite++; else esecuri++; })
+            .catch(function(){ esecuri++; })
+            .then(urmatorul);
+        });
+      })();
+    }
+
+    btnCadre.addEventListener('click', function(){ lucreaza(lista.length); });
+
+    /* Pornim singuri, discret, cat sa nu coste. Daca telefonul spune ca e
+       pe date mobile sau ca vrea sa economiseasca, nu incepem — asteptam
+       apasarea. Safari nu spune nimic despre conexiune; acolo pornim
+       oricum, dar doar cateva. */
+    var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    var economie = c && (c.saveData === true || c.type === 'cellular'
+                   || c.effectiveType === 'slow-2g' || c.effectiveType === '2g' || c.effectiveType === '3g');
+    if (!economie) {
+      lucreaza(Math.min(SINGUR, lista.length));
+    } else {
+      stare.textContent = 'Ești pe date mobile — apasă când ești pe wi-fi.';
+    }
+  })();
+
   if (btnSterge) btnSterge.addEventListener('click', function(){ if (confirm('Ștergi definitiv ' + refresh().length + ' fotografii?')) trimiteMultiple('sterge_multe'); });
   if (btnAproba) btnAproba.addEventListener('click', function(){ trimiteMultiple('aproba_multe'); });
 })();
