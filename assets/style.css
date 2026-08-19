@@ -93,7 +93,8 @@ img{max-width:100%;display:block}
 .hero .watermark{
   position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   font-family:var(--serif);font-size:min(44vw,520px);color:var(--green);
-  opacity:.05;font-weight:500;pointer-events:none;line-height:1;user-select:none;z-index:0;
+  opacity:.05;font-weight:500;pointer-events:none;line-height:1;
+  -webkit-user-select:none;user-select:none;z-index:0;
 }
 .hero-inner{position:relative;z-index:1}
 .hero h1{
@@ -416,7 +417,8 @@ a.poza:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 /* --- Inima (apreciază) pe miniaturile din galerie --- */
 .poza .inima{position:absolute;top:10px;right:10px;z-index:3;display:flex;align-items:center;gap:5px;
   background:rgba(20,15,10,.42);color:#fff;border:0;border-radius:999px;padding:6px 10px;
-  font-family:var(--sans);font-size:.78rem;cursor:pointer;backdrop-filter:blur(4px);transition:transform .15s,background .2s}
+  font-family:var(--sans);font-size:.78rem;cursor:pointer;
+  -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);transition:transform .15s,background .2s}
 .poza .inima:hover{transform:scale(1.06);background:rgba(20,15,10,.6)}
 .poza .inima.activ{background:rgba(179,80,62,.92)}
 .poza .inima.activ svg{fill:#fff;stroke:#fff}
@@ -495,18 +497,8 @@ a.poza:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
   .lb-caption .mesaj{font-size:.9rem}
 }
 
-/* --- Banda cu cele mai noi poze (pagina de start) --- */
-.banda{overflow:hidden;width:100%;
-  -webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);
-  mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
-.banda-track{display:flex;gap:14px;width:max-content;animation:banda-scroll linear infinite}
-.banda:hover .banda-track{animation-play-state:paused}
-.banda-item{position:relative;flex:none;width:200px;height:140px;border-radius:14px;overflow:hidden;
-  box-shadow:var(--shadow-sm);background:var(--card)}
-.banda-item img,.banda-item video{width:100%;height:100%;object-fit:cover;display:block}
-.banda-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;background:rgba(20,15,10,.22)}
-@keyframes banda-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-@media(max-width:680px){.banda-item{width:150px;height:108px}}
+/* Banda rulantă a fost scoasă din pagină și din cod; regulile ei plecaseră
+   din HTML, dar rămăseseră aici, trimise la fiecare invitat degeaba. */
 
 /* --- Carte de urări --- */
 .urari-grid{column-count:3;column-gap:18px;margin-top:24px}
