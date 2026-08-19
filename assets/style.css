@@ -463,6 +463,10 @@ img{max-width:100%;display:block}
 .lb-neredabil svg{color:#d9c9a6;margin-bottom:10px}
 .lb-neredabil .titlu{font-family:var(--serif);font-size:1.35rem;color:#fff;margin-bottom:6px}
 .lb-neredabil p{font-size:.9rem;line-height:1.5;color:#ddd2bf;margin:0 0 18px}
+/* Rândul dintre „Încearcă din nou" și „Descarcă filmul": explică a doua
+   variantă, deci stă mai mic și mai retras decât textul de sus. */
+.lb-neredabil p.mic{font-size:.78rem;color:#c3b8a4;margin:16px 0 10px}
+.lb-neredabil .btn+p.mic{margin-top:18px}
 
 /* ============================================================
    LIGHTBOX PE TELEFON
