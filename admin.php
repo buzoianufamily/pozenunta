@@ -624,6 +624,22 @@ $poze = $stmt->fetchAll();
     var stare = document.getElementById('cadre-stare');
     var lista = JSON.parse(document.getElementById('filme-fara-cadru').textContent || '[]');
 
+    /* Aceeasi verificare pe care o face si telefonul invitatului la
+       incarcare: un cadru complet negru nu e o miniatura, e o pata — iar
+       serverul l-ar lua drept miniatura buna si n-ar mai incerca nimic.
+       Lipsea aici, deci panoul putea salva exact ce telefonul refuza. */
+    function cadruGol(ctx, w, h){
+      try {
+        var pasX = Math.max(1, Math.floor(w/8)), pasY = Math.max(1, Math.floor(h/8)), maxim = 0;
+        for (var x=0; x<w; x+=pasX) for (var y=0; y<h; y+=pasY){
+          var p = ctx.getImageData(x,y,1,1).data;
+          var lum = 0.299*p[0] + 0.587*p[1] + 0.114*p[2];
+          if (lum > maxim) maxim = lum;
+        }
+        return maxim < 12;
+      } catch(e){ return false; }
+    }
+
     function cadruDin(url){
       return new Promise(function(res){
         var v = document.createElement('video');
@@ -645,7 +661,9 @@ $poze = $stmt->fetchAll();
             var s = Math.min(1, 700/Math.max(w,h));
             var c = document.createElement('canvas');
             c.width = Math.round(w*s); c.height = Math.round(h*s);
-            c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+            var ctx = c.getContext('2d');
+            ctx.drawImage(v, 0, 0, c.width, c.height);
+            if (cadruGol(ctx, c.width, c.height)) { termina(null); return; }
             c.toBlob(function(b){ termina(b); }, 'image/jpeg', 0.82);
           } catch(e){ termina(null); }
         });
