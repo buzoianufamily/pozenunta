@@ -262,12 +262,27 @@ rand_raport('Imagini', 'Lățime miniatură (config)', THUMB_WIDTH . ' px', 'inf
    încearcă singur — dar numai dacă are cu ce. Aici se vede dacă are. */
 $potRula = poate_rula_programe();
 $ffmpeg  = $potRula ? ffmpeg_cale() : null;
-rand_raport('Imagini', 'Miniaturi pentru filme, pe server',
-    $ffmpeg !== null ? 'ffmpeg găsit (' . h($ffmpeg) . ')' : ($potRula ? 'ffmpeg lipsește' : 'rularea programelor e oprită'),
-    $ffmpeg !== null ? 'ok' : 'info',
-    $ffmpeg !== null
-        ? 'Când telefonul nu reușește să scoată primul cadru, îl scoate serverul.'
-        : 'Nu e obligatoriu. Aproape toate filmele primesc miniatura de la telefonul care le-a trimis; cele care nu, apar în bandă cu un dreptunghi și semnul de play.');
+if ($ffmpeg !== null) {
+    rand_raport('Imagini', 'Miniaturi pentru filme, pe server', 'ffmpeg găsit (' . h($ffmpeg) . ')', 'ok',
+        'Când telefonul nu reușește să scoată primul cadru, îl scoate serverul.');
+} elseif ($potRula) {
+    rand_raport('Imagini', 'Miniaturi pentru filme, pe server', 'ffmpeg lipsește', 'info',
+        'Serverul ARE voie să ruleze programe, doar că ffmpeg nu e instalat. Dacă vrei miniaturi și '
+      . 'pentru filmele cărora telefonul nu le-a putut face una: descarcă un ffmpeg „static” pentru Linux '
+      . '(o singură arhivă, de pe johnvansickle.com/ffmpeg), fă lângă site un folder numit bin și urcă '
+      . 'în el fișierul ffmpeg din arhivă — deci bin/ffmpeg — apoi dă-i drepturi 755 din File Manager. '
+      . 'Se găsește singur, nu trebuie schimbat nimic în cod. Alternativ, cere-le celor de la găzduire '
+      . 'să-l instaleze. Oricum ar fi, nu e obligatoriu.');
+} else {
+    rand_raport('Imagini', 'Miniaturi pentru filme, pe server', 'rularea programelor e oprită', 'info',
+        'Găzduirea nu permite pornirea de programe (proc_open), deci serverul nu poate scoate cadre din filme. '
+      . 'Nu e obligatoriu: aproape toate filmele primesc miniatura de la telefonul care le-a trimis.');
+}
+if ($ffmpeg === null) {
+    rand_raport('Imagini', 'Fără ffmpeg, ce se pierde', 'doar filmele fără cadru de la telefon', 'info',
+        'Restul merge la fel. Un asemenea film apare în bandă cu un dreptunghi și semnul de play, '
+      . 'iar în galerie se deschide și se vede normal.');
+}
 
 /* ============================================================
    4. BAZA DE DATE

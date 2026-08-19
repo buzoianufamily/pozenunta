@@ -538,14 +538,36 @@ function ffmpeg_cale(): ?string {
     if ($cale !== false) return $cale;
     if (!poate_rula_programe()) return $cale = null;
 
-    $candidati = ['/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/opt/bin/ffmpeg', '/bin/ffmpeg'];
-    foreach ($candidati as $c) {
-        if (@is_executable($c)) return $cale = $c;
+    $candidati = [];
+
+    /* 1. Calea scrisă de mână în config.php, dacă e pusă. */
+    if (defined('FFMPEG_CALE') && FFMPEG_CALE !== '') $candidati[] = FFMPEG_CALE;
+
+    /* 2. În contul propriu — aici îl poți pune tu, fără să depinzi de
+          găzduire: urci fișierul în „bin/ffmpeg" lângă site. */
+    $candidati[] = __DIR__ . '/bin/ffmpeg';
+    if (!empty($_SERVER['HOME'])) {
+        $candidati[] = rtrim($_SERVER['HOME'], '/') . '/bin/ffmpeg';
+        $candidati[] = rtrim($_SERVER['HOME'], '/') . '/ffmpeg/ffmpeg';
     }
-    /* Poate e în altă parte: întrebăm sistemul unde îl ține. */
-    $gasit = ruleaza_program(['/usr/bin/which', 'ffmpeg'], 5);
-    if ($gasit !== null) {
-        $linie = trim(strtok($gasit, "\n"));
+
+    /* 3. Locurile obișnuite de pe server, inclusiv cele de pe cPanel. */
+    foreach ([
+        '/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/bin/ffmpeg', '/opt/bin/ffmpeg',
+        '/usr/local/cpanel/3rdparty/bin/ffmpeg', '/opt/cpanel/ffmpeg/bin/ffmpeg',
+        '/usr/share/ffmpeg/ffmpeg', '/opt/ffmpeg/bin/ffmpeg',
+    ] as $c) $candidati[] = $c;
+
+    foreach ($candidati as $c) {
+        if ($c !== '' && @is_executable($c)) return $cale = $c;
+    }
+
+    /* 4. Ultima încercare: întrebăm sistemul. „command -v" merge în orice
+          shell; „which" lipsește pe unele găzduiri. */
+    foreach ([['/bin/sh', '-c', 'command -v ffmpeg'], ['/usr/bin/env', 'which', 'ffmpeg']] as $intrebare) {
+        $gasit = ruleaza_program($intrebare, 5);
+        if ($gasit === null) continue;
+        $linie = trim((string)strtok($gasit, "\n"));
         if ($linie !== '' && @is_executable($linie)) return $cale = $linie;
     }
     return $cale = null;
