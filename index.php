@@ -4,19 +4,37 @@ asigura_schema();
 
 $pozeRecente  = [];
 $urariRecente = [];
-/* Banda care se rotește pe prima pagină. Cerem mai multe momente decât
-   arătăm și le punem întâi pe cele cu miniatură: o miniatură are ~55 KB,
-   iar originalul unei poze de telefon are peste un megaoctet. Filmele
-   intră și ele, dar NUMAI ca miniatură — niciun element de film pe prima
-   pagină, ca nimic să nu pornească singur și să nu tragă zeci de MB. */
+/* Banda care se rotește pe prima pagină. Momentele se aleg amestecat din
+   TOT albumul, nu doar dintre cele noi: la miezul nopții se văd și pozele
+   de la venirea invitaților, nu numai ultimele zece minute. La fiecare
+   deschidere a paginii iese altă selecție.
+
+   Amestecarea se face pe id-uri, nu pe rândurile întregi: baza de date
+   sortează atunci o listă de numere, nu tot conținutul tabelei.
+
+   Cerem mai multe decât arătăm și le punem întâi pe cele cu miniatură (o
+   miniatură are ~55 KB, originalul unei poze de telefon peste un
+   megaoctet). Filmele intră și ele, dar NUMAI ca miniatură — niciun
+   element de film pe prima pagină, ca nimic să nu pornească singur. */
 define('BANDA_MOMENTE', 14);
 try {
-    $candidati = db()->query("SELECT * FROM poze WHERE aprobat = 1 ORDER BY data_incarcare DESC, id DESC LIMIT 40")->fetchAll();
-    $cuMiniatura = []; $faraMiniatura = [];
-    foreach ($candidati as $c) {
-        if (are_miniatura($c)) $cuMiniatura[] = $c; else $faraMiniatura[] = $c;
+    $ids = db()->query('SELECT id FROM poze WHERE aprobat = 1 ORDER BY RAND() LIMIT 40')
+                ->fetchAll(PDO::FETCH_COLUMN);
+    if ($ids) {
+        $sem = implode(',', array_fill(0, count($ids), '?'));
+        $st  = db()->prepare("SELECT * FROM poze WHERE id IN ($sem)");
+        $st->execute(array_map('intval', $ids));
+        $candidati = $st->fetchAll();
+        /* „IN" întoarce rândurile în ordinea lui, nu în a noastră — le
+           amestecăm din nou aici, altfel banda ar ieși mereu crescător. */
+        shuffle($candidati);
+
+        $cuMiniatura = []; $faraMiniatura = [];
+        foreach ($candidati as $c) {
+            if (are_miniatura($c)) $cuMiniatura[] = $c; else $faraMiniatura[] = $c;
+        }
+        $pozeRecente = array_slice(array_merge($cuMiniatura, $faraMiniatura), 0, BANDA_MOMENTE);
     }
-    $pozeRecente = array_slice(array_merge($cuMiniatura, $faraMiniatura), 0, BANDA_MOMENTE);
 } catch (Throwable $e) {}
 try { $urariRecente = db()->query("SELECT nume, mesaj, data_creare FROM urari WHERE aprobat = 1 ORDER BY data_creare DESC, id DESC LIMIT 6")->fetchAll(); } catch (Throwable $e) {}
 
