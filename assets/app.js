@@ -217,9 +217,12 @@
     }
 
     function adauga(fileList) {
-      var sarite = 0, preaMari = [];
+      var sarite = 0, preaMari = [], nepotrivite = 0;
       Array.prototype.forEach.call(fileList, function (f) {
-        if (!esteImagine(f) && !esteVideo(f)) return;
+        /* Un fișier care nu e nici poză, nici film, era pur și simplu
+           ignorat: invitatul alegea ceva și nu se întâmpla nimic, fără
+           un cuvânt. Acum i se spune. */
+        if (!esteImagine(f) && !esteVideo(f)) { nepotrivite++; return; }
         if (dejaInLista(f)) { sarite++; return; }
 
         /* Filmele se trimit așa cum sunt, deci le știm mărimea de pe acum.
@@ -235,7 +238,11 @@
         lista.appendChild(item.row);
         coada.push(item);
       });
-      if (sarite > 0) {
+      if (nepotrivite > 0) {
+        toast(nepotrivite === 1
+          ? 'Acel fișier nu e o poză sau un film, așa că nu l-am adăugat.'
+          : 'Am lăsat deoparte ' + nepotrivite + ' fișiere care nu sunt poze sau filme.');
+      } else if (sarite > 0) {
         toast(sarite === 1 ? 'O fotografie era deja în listă.' : 'Am sărit ' + sarite + ' fișiere care erau deja în listă.');
       }
       if (preaMari.length) {
@@ -718,8 +725,11 @@
         return -1;
       }
 
+      /* Curățăm adresa ÎNAINTE de a deschide: deschiderea pune o intrare
+         în istoric (ca „înapoi" să închidă poza), iar o curățare de după
+         ar șterge tocmai acea intrare. */
       var i = caută();
-      if (i >= 0) { deschideLightbox(i); curataAdresa(); return Promise.resolve(); }
+      if (i >= 0) { curataAdresa(); deschideLightbox(i); return Promise.resolve(); }
 
       /* Nu e printre momentele încărcate — banda alege din tot albumul,
          deci poate fi de la începutul serii. Îl cerem punctual, într-o
@@ -728,14 +738,14 @@
       return fetch('api.php?actiune=poza&id=' + id)
         .then(function (r) { return r.json(); })
         .then(function (d) {
+          curataAdresa();                       // întâi adresa, apoi istoricul
           if (d && d.ok && d.poza) {
             sincronizeazaLike([d.poza]);
             toate.push(d.poza);
             deschideLightbox(toate.length - 1);
           }
         })
-        .catch(function () {})
-        .finally(curataAdresa);
+        .catch(curataAdresa);
     }
 
     incarcaPagina().then(deschideDinAdresa);
@@ -846,19 +856,46 @@
         function (el) { return !el.hasAttribute('hidden') && el.offsetParent !== null; }
       );
     }
+    /* Pe telefon, „înapoi" e gestul cu care se închide orice e deschis.
+       Fără asta, invitatul deschidea o poză, apăsa înapoi ca s-o închidă
+       și ieșea din galerie cu totul — pierzând locul până unde derulase,
+       după ce trecuse poate prin două sute de momente.
+
+       Punem o intrare în istoric la deschidere, iar „înapoi" o consumă și
+       închide doar poza. Închiderea din X, Escape sau apăsarea pe fundal
+       trece prin aceeași ușă, ca istoricul să nu se umple cu intrări. */
+    var intrareInIstoric = false;
+
     function deschideLightbox(i) {
       focalizatInainte = document.activeElement;
       randeaza(i);
       lb.classList.add('deschis'); lb.setAttribute('aria-hidden', 'false');
       document.body.style.overflow = 'hidden';
+      if (!intrareInIstoric && window.history && history.pushState) {
+        try { history.pushState({ lb: true }, ''); intrareInIstoric = true; } catch (e) {}
+      }
       var f = focalizabile(); if (f.length) f[0].focus();
     }
-    function inchide() {
+
+    /* Închiderea propriu-zisă, fără să umble la istoric. */
+    function inchideAcum() {
       lb.classList.remove('deschis'); lb.setAttribute('aria-hidden', 'true');
       lbCont.innerHTML = ''; lbIdActual = null; document.body.style.overflow = '';
       if (focalizatInainte && focalizatInainte.focus) focalizatInainte.focus();
       focalizatInainte = null;
     }
+
+    /* Ce cheamă butoanele: dacă am pus o intrare în istoric, o scoatem —
+       iar „popstate" face închiderea. Altfel închidem direct. */
+    function inchide() {
+      if (intrareInIstoric) { history.back(); return; }
+      inchideAcum();
+    }
+
+    window.addEventListener('popstate', function () {
+      intrareInIstoric = false;
+      if (lb.classList.contains('deschis')) inchideAcum();
+    });
     function navig(dir) {
       var nou = idxCurent + dir;
       if (nou < 0) nou = toate.length - 1;

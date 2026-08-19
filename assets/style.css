@@ -477,7 +477,11 @@ a.poza:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
    butoanele coboară într-o bară sub el, unde ajunge degetul mare, iar
    fișierul primește exact înălțimea rămasă. Sus rămâne doar X-ul.
    ============================================================ */
-@media (max-width: 640px) {
+/* Și „ecran scund", nu doar „ecran îngust": un telefon întors pe
+   orizontală are 844 de puncte lățime, deci scăpa de regulile de mai jos
+   și primea așezarea de calculator — cu săgețile peste film. Iar oamenii
+   întorc telefonul tocmai ca să se uite la filme. */
+@media (max-width: 640px), (max-height: 520px) {
   /* Loc pentru bara de jos: fișierul nu mai ajunge niciodată sub ea. */
   .lb-media{max-width:96vw;max-height:calc(100vh - 178px);max-height:calc(100dvh - 178px)}
 
