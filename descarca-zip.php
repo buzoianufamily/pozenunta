@@ -159,7 +159,13 @@ foreach ($felie as $r) {
 
     // nume prietenos în arhivă: data + numele invitatului
     $ext      = pathinfo($r['nume_fisier'], PATHINFO_EXTENSION);
-    $eticheta = $r['nume_invitat'] ? preg_replace('/[^\p{L}\p{N} _-]/u', '', $r['nume_invitat']) : 'invitat';
+    /* Scoatem ce n-are ce căuta într-un nume de fișier (emoji, semne),
+       apoi strângem spațiile rămase. Fără asta, „Colegii de la birou 🤍"
+       devenea un nume terminat cu spațiu — iar Windows nu dezarhivează
+       curat asemenea nume. */
+    $eticheta = $r['nume_invitat'] ? preg_replace('/[^\p{L}\p{N} _-]/u', '', $r['nume_invitat']) : '';
+    $eticheta = trim(preg_replace('/\s+/u', ' ', (string)$eticheta));
+    if ($eticheta === '') $eticheta = 'invitat';
     $baza     = date('Ymd_His', strtotime($r['data_incarcare'])) . '_' . $eticheta;
     $numeInZip = $baza . '.' . $ext;
     $i = 1;
@@ -180,8 +186,17 @@ if (!$zip->close()) {
 }
 
 $sufix   = $nrTranse > 1 ? '_partea' . $transa . 'din' . $nrTranse : '';
-$numeZip = 'Album_' . preg_replace('/[^A-Za-z0-9]/', '', NUME_MIRE)
-         . '_' . preg_replace('/[^A-Za-z0-9]/', '', NUME_MIREASA)
+/* Numele arhivei trebuie să meargă pe orice sistem, deci fără diacritice —
+   dar înlocuite, nu șterse: „Răzvan" devenea „Rzvan" pe fișierul pe care
+   tocmai voi îl păstrați toată viața. */
+function fara_diacritice(string $t): string {
+    $harta = ['ă'=>'a','â'=>'a','î'=>'i','ș'=>'s','ş'=>'s','ț'=>'t','ţ'=>'t',
+              'Ă'=>'A','Â'=>'A','Î'=>'I','Ș'=>'S','Ş'=>'S','Ț'=>'T','Ţ'=>'T'];
+    return preg_replace('/[^A-Za-z0-9]/', '', strtr($t, $harta));
+}
+
+$numeZip = 'Album_' . fara_diacritice(NUME_MIRE)
+         . '_' . fara_diacritice(NUME_MIREASA)
          . $sufix . '_' . date('Ymd') . '.zip';
 
 /* Oprim orice tampon: fișierul poate fi de ordinul gigaocteților. */
