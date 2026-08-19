@@ -100,7 +100,7 @@ function texte_editabile(): array {
         'tx_nume_ajutor'     => ['Prima pagină', 'Îndemnul de sub câmpul cu numele', 'Scrie-ți numele ca să știm ale cui sunt pozele — opțional, dar ne-ar bucura mult 🤍', true],
         'tx_buton_incarca'   => ['Prima pagină', 'Textul butonului de încărcare', 'Încarcă în album', false],
         'tx_succes_titlu'    => ['Prima pagină', 'Titlul de mulțumire, după încărcare', 'Mulțumim din suflet!', false],
-        'tx_recente_titlu'   => ['Prima pagină', 'Titlul secțiunii cu poze recente', 'Cele mai noi momente', false],
+        'tx_recente_titlu'   => ['Prima pagină', 'Titlul benzii cu amintiri', 'Amintiri de la voi', false],
         'tx_urari_titlu'     => ['Prima pagină', 'Titlul secțiunii cu urări', 'Urări de la invitați', false],
 
         /* ---------- galerie ---------- */

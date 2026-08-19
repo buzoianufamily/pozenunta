@@ -51,6 +51,30 @@ if ($actiune === 'lista') {
     exit;
 }
 
+/* Un singur moment, după id. Trebuie pentru banda de pe prima pagină:
+   ea alege amestecat din tot albumul, deci poate nimeri o poză de la
+   începutul serii, aflată abia pe pagina a cincea a galeriei. Fără asta,
+   apăsarea deschidea galeria, dar nu și momentul cerut — iar a încărca
+   pagină după pagină până la el ar fi însemnat zeci de cereri. */
+if ($actiune === 'poza') {
+    $id = (int)($_GET['id'] ?? 0);
+    if ($id <= 0) { echo json_encode(['ok' => false]); exit; }
+
+    $doarAprobate = !(este_admin() && ($_GET['tot'] ?? '') === '1');
+    $sql = 'SELECT * FROM poze WHERE id = ?' . ($doarAprobate ? ' AND aprobat = 1' : '');
+    $st  = db()->prepare($sql);
+    $st->execute([$id]);
+    $rand = $st->fetch();
+    if (!$rand) { echo json_encode(['ok' => false]); exit; }
+
+    $poza = poza_pentru_json($rand);
+    $mele = aprecieri_mele([(int)$rand['id']]);
+    $poza['apreciat'] = isset($mele[$poza['id']]);
+
+    echo json_encode(['ok' => true, 'poza' => $poza], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if ($actiune === 'numar') {
     $total = (int)db()->query('SELECT COUNT(*) FROM poze WHERE aprobat = 1')->fetchColumn();
     echo json_encode(['ok' => true, 'total' => $total]);

@@ -408,7 +408,7 @@
         var campuri = { actiune: 'finalizeaza', id: item.sid, name: item.name, nume: item.nume, mesaj: item.mesaj };
         var fis = item.poster ? [{ camp: 'poster', blob: item.poster, nume: 'poster.jpg' }] : null;
         var fin = await cerereBucati(campuri, fis, null);
-        if (fin && fin.ok) { item.duplicat = !!fin.duplicat; return true; }
+        if (fin && fin.ok) { item.duplicat = !!fin.duplicat; item.moderare = !!fin.moderare; return true; }
         item.ultimaEroare = (fin && fin.eroare) ? fin.eroare : null;
         return false;
       })();
@@ -426,7 +426,7 @@
             if (ok) return true;
           } else {
             var rez = await urca(item, function (p) { setStare(item, 'Se încarcă… ' + Math.round(p * 100) + '%', p); });
-            if (rez && rez.ok) { item.duplicat = !!rez.duplicat; return true; }
+            if (rez && rez.ok) { item.duplicat = !!rez.duplicat; item.moderare = !!rez.moderare; return true; }
             item.ultimaEroare = (rez && rez.erori && rez.erori[0]) ? rez.erori[0] : null;
           }
           if (t < MAX_TRIES - 1) {
@@ -497,13 +497,39 @@
       var dubl  = gata.filter(function (it) { return it.duplicat; }).length;
       var noi   = done - dubl;
       var erori = coada.filter(function (it) { return it.status === 'error'; }).length;
+      /* Când e un singur fișier, spunem ce este. „Fotografia ta a fost
+         adăugată" după un film de 40 MB sună a greșeală, iar la nuntă se
+         încarcă multe filme. La mai multe deodată ramane „fișiere", care
+         e potrivit oricum ar fi amestecate. */
+      var unNou  = noi  === 1 ? gata.filter(function (it) { return !it.duplicat; })[0] : null;
+      var unVechi= dubl === 1 ? gata.filter(function (it) { return  it.duplicat; })[0] : null;
+
+      /* Când mirii au pornit moderarea, fișierul NU e încă în album — îl
+         văd ei întâi. Serverul spunea asta în răspuns, dar pagina nu se
+         uita: invitatul era trimis într-o galerie unde poza lui nu era,
+         și credea că s-a stricat ceva. */
+      var subModerare = gata.some(function (it) { return it.moderare && !it.duplicat; });
+      var eFilm = unNou && unNou.isVideo;
+
       if (done > 0 && erori === 0) {
         if (noi === 0) {
           succesTxt.textContent = dubl === 1
-            ? 'Această fotografie era deja în album.'
+            ? (unVechi && unVechi.isVideo ? 'Acest film era deja în album.' : 'Această fotografie era deja în album.')
             : 'Toate cele ' + dubl + ' fișiere erau deja în album.';
         } else {
-          succesTxt.textContent = (noi === 1 ? 'Fotografia ta a fost adăugată în album.' : 'Cele ' + noi + ' fișiere au fost adăugate în album.')
+          var subiect = noi === 1 ? (eFilm ? 'Filmul tău' : 'Fotografia ta') : 'Cele ' + noi + ' fișiere';
+          var urmare;
+          if (subModerare) {
+            urmare = noi === 1
+              ? (eFilm ? ' a ajuns la miri și va apărea în album după ce îl văd. 🤍'
+                       : ' a ajuns la miri și va apărea în album după ce o văd. 🤍')
+              : ' au ajuns la miri și vor apărea în album după ce le văd. 🤍';
+          } else {
+            urmare = noi === 1
+              ? (eFilm ? ' a fost adăugat în album.' : ' a fost adăugată în album.')
+              : ' au fost adăugate în album.';
+          }
+          succesTxt.textContent = subiect + urmare
             + (dubl > 0 ? (dubl === 1 ? ' Unul era deja acolo.' : ' ' + dubl + ' erau deja acolo.') : '');
         }
         zona.style.display = 'none'; succes.style.display = 'block';
@@ -568,7 +594,12 @@
       idbAll().then(function (rest) {
         if (!rest || !rest.length) return;
         var banner = document.createElement('div'); banner.className = 'banner-reluare';
-        banner.innerHTML = '<span>Avem ' + rest.length + ' fișier(e) neterminat(e). Continuăm automat de unde am rămas…</span>';
+        /* „1 fișier(e) neterminat(e)" e exact genul de text care sperie
+           pe cineva care tocmai a pierdut netul. Îl scriem omenește. */
+        banner.innerHTML = '<span>' + (rest.length === 1
+            ? 'Ai un fișier rămas neterminat.'
+            : 'Ai ' + rest.length + ' fișiere rămase neterminate.')
+          + ' Continuăm automat de unde am rămas…</span>';
         var ren = document.createElement('button'); ren.className = 'btn btn-ghost btn-mic'; ren.textContent = 'Renunță';
         ren.addEventListener('click', function () { idbClear().then(function () { coada = coada.filter(function (it) { return it.status !== 'pending'; }); lista.innerHTML = ''; banner.remove(); actualizeazaButon(); }); });
         banner.appendChild(ren);
@@ -666,7 +697,48 @@
     chips.forEach(function (c) { c.addEventListener('click', function () { var s = c.getAttribute('data-sort'); if (s === sortare) return; sortare = s; chips.forEach(function (x) { x.classList.remove('activ'); }); c.classList.add('activ'); reseteaza(); incarcaPagina(); }); });
 
     new IntersectionObserver(function (e) { if (e[0].isIntersecting) incarcaPagina(); }, { rootMargin: '600px' }).observe(sentinela);
-    incarcaPagina();
+
+    /* Venit de pe banda de pe prima pagină: adresa poartă „#m123", adică
+       „deschide-mi momentul acesta". Aici are voie să pornească filmul —
+       pe prima pagină nu, ca să nu tragă nimic nimeni degeaba.
+       Îl deschidem după ce s-a încărcat prima pagină de momente; banda
+       arată cele mai noi, deci sunt toate acolo. */
+    function deschideDinAdresa() {
+      var m = /^#m(\d+)$/.exec(location.hash || '');
+      /* Curățăm adresa oricum: dacă închide și reîncarcă pagina, nu vrem
+         să-i sară din nou același fișier în față. */
+      function curataAdresa() {
+        if (history.replaceState) history.replaceState(null, '', location.pathname + location.search);
+      }
+      if (!m) return Promise.resolve();
+      var id = parseInt(m[1], 10);
+
+      function caută() {
+        for (var i = 0; i < toate.length; i++) if (toate[i].id === id) return i;
+        return -1;
+      }
+
+      var i = caută();
+      if (i >= 0) { deschideLightbox(i); curataAdresa(); return Promise.resolve(); }
+
+      /* Nu e printre momentele încărcate — banda alege din tot albumul,
+         deci poate fi de la începutul serii. Îl cerem punctual, într-o
+         singură cerere, în loc să încărcăm galeria pagină cu pagină până
+         la el. */
+      return fetch('api.php?actiune=poza&id=' + id)
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d && d.ok && d.poza) {
+            sincronizeazaLike([d.poza]);
+            toate.push(d.poza);
+            deschideLightbox(toate.length - 1);
+          }
+        })
+        .catch(function () {})
+        .finally(curataAdresa);
+    }
+
+    incarcaPagina().then(deschideDinAdresa);
 
     /* ---- lightbox ---- */
     var lb = document.getElementById('lightbox'), lbCont = document.getElementById('lb-continut'), lbCap = document.getElementById('lb-caption'), lbDl = document.getElementById('lb-download');
@@ -703,6 +775,27 @@
       lbCont.innerHTML = p.tip === 'video'
         ? '<video class="lb-media" src="' + esc(p.original) + '" controls autoplay playsinline></video>'
         : '<img class="lb-media" src="' + esc(p.original) + '" alt="">';
+
+      /* Un iPhone care filmează în 4K scoate un .mov pe care telefoanele
+         Android și multe calculatoare nu îl pot deschide. Miniatura din
+         grilă e făcută chiar de telefonul care a filmat, deci fișierul
+         arată normal — iar la apăsare invitatul primea un dreptunghi
+         negru, fără un cuvânt. Serverul nu poate schimba formatul, dar
+         măcar spunem ce se întâmplă și dăm filmul la descărcat, unde
+         aplicația telefonului îl deschide fără probleme. */
+      if (p.tip === 'video') {
+        lbCont.querySelector('video').addEventListener('error', function () {
+          if (lbIdActual !== p.id) return;          // între timp a trecut mai departe
+          lbCont.innerHTML =
+            '<div class="lb-neredabil">' +
+              '<svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M12 8v5"/><path d="M12 16.5v.01"/><circle cx="12" cy="12" r="9"/></svg>' +
+              '<div class="titlu">Filmul nu se poate reda aici</div>' +
+              '<p>A fost filmat într-un format pe care acest telefon nu îl deschide în pagină. ' +
+              'Descarcă-l și îl vezi în aplicația ta de filme.</p>' +
+              '<a class="btn btn-primar" href="' + esc(p.original) + '" download="' + esc(numeDescarcare(p)) + '">Descarcă filmul</a>' +
+            '</div>';
+        });
+      }
       var cap = '';
       if (p.nume) cap += '<div class="nume">' + esc(p.nume) + '</div>';
       if (p.mesaj) cap += '<div class="mesaj">' + esc(p.mesaj) + '</div>';
