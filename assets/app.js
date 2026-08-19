@@ -7,6 +7,13 @@
 (function () {
   'use strict';
 
+  /* Semnul că fișierul acesta a ajuns și a pornit. Pagina îl caută după
+     câteva secunde: dacă lipsește, înseamnă că nu s-a încărcat (o pană
+     scurtă de rețea exact atunci) — iar atunci zona de încărcare arată
+     bine, dar nu face nimic. Fără semnul ăsta, invitatul n-ar avea de
+     unde ști de ce nu merge. */
+  window.NUNTA_PORNIT = true;
+
   /* ---------- utilitare ---------- */
   var toastEl = document.getElementById('toast'), toastTimer;
   function toast(msg) {
