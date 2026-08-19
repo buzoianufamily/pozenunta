@@ -887,8 +887,15 @@
     function randeaza(i) {
       var p = toate[i]; if (!p) return; idxCurent = i; lbIdActual = p.id;
       elibereazaVideo();
+      /* „poster": miniatura pe care o avem oricum. Fără ea, cât timp
+         filmul se aduce de pe server invitatul se uită la un dreptunghi
+         negru și crede că s-a stricat. Un film de telefon are zeci sau
+         sute de megaocteți, deci așteptarea e reală — măcar să vadă
+         cadrul, nu golul. */
       lbCont.innerHTML = p.tip === 'video'
-        ? '<video class="lb-media" src="' + esc(p.original) + '" controls autoplay playsinline></video>'
+        ? '<video class="lb-media" src="' + esc(p.original) + '"'
+          + (p.miniatura ? ' poster="' + esc(p.preview) + '"' : '')
+          + ' controls autoplay playsinline preload="auto"></video>'
         : '<img class="lb-media" src="' + esc(p.original) + '" alt="">';
 
       /* Poza mare nu ajunge — pe wi-fi-ul sălii, un fișier de un megaoctet
@@ -917,7 +924,47 @@
          măcar spunem ce se întâmplă și dăm filmul la descărcat, unde
          aplicația telefonului îl deschide fără probleme. */
       if (p.tip === 'video') {
-        lbCont.querySelector('video').addEventListener('error', function () {
+        var vid = lbCont.querySelector('video');
+
+        /* Filmele NU se comprimă: pleacă de pe telefon exact cum le-a
+           scos camera, iar un minut filmat în 4K are sute de megaocteți.
+           Pe rețeaua unei săli, împărțită de toată lumea, asta înseamnă
+           pornire înceată și opriri la mijloc, ca la orice film prea gros
+           pentru conexiune. Nu putem face fișierul mai mic acum, dar
+           putem să nu-l lăsăm pe invitat să se uite la un ecran mort și
+           să creadă că aplicația s-a stricat: îi spunem că se încarcă și
+           îi dăm drumul spre player-ul telefonului, care duce fișierele
+           mari mai bine decât pagina. */
+        var asteptare = document.createElement('div');
+        asteptare.className = 'lb-asteapta';
+        asteptare.innerHTML =
+          '<span class="rotitor" aria-hidden="true"></span>' +
+          '<span class="text">Se încarcă filmul…</span>' +
+          '<a class="lb-nativ" href="' + esc(p.original) + '" target="_blank" rel="noopener">' +
+          'Deschide-l în player-ul telefonului</a>';
+        asteptare.hidden = true;
+        lbCont.appendChild(asteptare);
+
+        var aratat = null;
+        function araraAsteptarea() {
+          if (lbIdActual !== p.id) return;
+          clearTimeout(aratat);
+          /* O clipită de așteptare e normală; nu clipim la fiecare
+             sacadare. Abia după o secundă și jumătate merită un cuvânt. */
+          aratat = setTimeout(function () {
+            if (lbIdActual === p.id) asteptare.hidden = false;
+          }, 1500);
+        }
+        function ascundeAsteptarea() { clearTimeout(aratat); asteptare.hidden = true; }
+
+        ['waiting', 'stalled', 'loadstart'].forEach(function (ev) {
+          vid.addEventListener(ev, araraAsteptarea);
+        });
+        ['playing', 'canplay', 'error'].forEach(function (ev) {
+          vid.addEventListener(ev, ascundeAsteptarea);
+        });
+
+        vid.addEventListener('error', function () {
           if (lbIdActual !== p.id) return;          // între timp a trecut mai departe
           /* Eroarea de la <video> nu spune DE CE. Poate fi formatul, dar
              la fel de bine o clipă de rețea proastă sau telefonul care nu
