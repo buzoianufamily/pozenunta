@@ -281,11 +281,12 @@ $poze = $stmt->fetchAll();
         <strong><?= count($filmeFaraCadru) ?></strong>
         <?= count($filmeFaraCadru) === 1 ? 'film nu are miniatură' : 'filme nu au miniatură' ?>.
         De obicei cadrul îl trimite telefonul care a filmat; când n-a putut, îl scoate browserul de aici.
-        Filmele se descarcă pe dispozitivul tău cât durează, deci fă-o pe wi-fi.
+        Primele câteva se fac singure, de îndată ce deschizi panoul. Restul le ceri cu butonul,
+        pentru că filmele se descarcă pe dispozitivul tău cât durează — deci mai bine pe wi-fi.
         Dacă unul nu poate fi deschis nici aici, încearcă de pe iPhone — el citește formatele Apple.
       </p>
       <div class="rand-form" style="gap:12px;align-items:center;margin-top:12px">
-        <button class="btn btn-primar btn-mic" id="btn-cadre">Fă miniaturile lipsă</button>
+        <button class="btn btn-primar btn-mic" id="btn-cadre">Fă-le pe toate</button>
         <span class="sel-info" id="cadre-stare"></span>
       </div>
       <script type="application/json" id="filme-fara-cadru"><?= json_encode($filmeFaraCadru, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?></script>
@@ -648,12 +649,23 @@ $poze = $stmt->fetchAll();
       });
     }
 
-    btnCadre.addEventListener('click', function(){
-      btnCadre.disabled = true;
-      var reusite = 0, esecuri = 0, i = 0;
+    var reusite = 0, esecuri = 0, i = 0, pornit = false;
+
+    /* Cate se fac de la sine, fara sa intrebe. Un film adus pe date mobile
+       costa; cateva nu se simt, zece da. Peste atat, intrebam. */
+    var SINGUR = 3;
+
+    function lucreaza(pana){
+      pornit = true; btnCadre.disabled = true;
       (function urmatorul(){
         if (i >= lista.length){
           stare.textContent = reusite + ' gata' + (esecuri ? ', ' + esecuri + ' nu s-au putut deschide aici' : '') + '. Reîncarcă pagina.';
+          btnCadre.style.display = 'none'; return;
+        }
+        if (i >= pana){
+          var ramase = lista.length - i;
+          stare.textContent = reusite + ' gata. Mai sunt ' + ramase + '.';
+          btnCadre.textContent = 'Continuă cu ' + (ramase === 1 ? 'ultimul' : 'restul de ' + ramase);
           btnCadre.disabled = false; return;
         }
         var f = lista[i++];
@@ -671,7 +683,22 @@ $poze = $stmt->fetchAll();
             .then(urmatorul);
         });
       })();
-    });
+    }
+
+    btnCadre.addEventListener('click', function(){ lucreaza(lista.length); });
+
+    /* Pornim singuri, discret, cat sa nu coste. Daca telefonul spune ca e
+       pe date mobile sau ca vrea sa economiseasca, nu incepem — asteptam
+       apasarea. Safari nu spune nimic despre conexiune; acolo pornim
+       oricum, dar doar cateva. */
+    var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    var economie = c && (c.saveData === true || c.type === 'cellular'
+                   || c.effectiveType === 'slow-2g' || c.effectiveType === '2g' || c.effectiveType === '3g');
+    if (!economie) {
+      lucreaza(Math.min(SINGUR, lista.length));
+    } else {
+      stare.textContent = 'Ești pe date mobile — apasă când ești pe wi-fi.';
+    }
   })();
 
   if (btnSterge) btnSterge.addEventListener('click', function(){ if (confirm('Ștergi definitiv ' + refresh().length + ' fotografii?')) trimiteMultiple('sterge_multe'); });
