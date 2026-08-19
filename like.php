@@ -67,7 +67,10 @@ try {
     echo json_encode([
         'ok'     => false,
         'eroare' => $lipsaTabela
-            ? 'Tabela aprecierilor lipsește din baza de date. Deschide instalare.php.'
+            /* Nu mai trimitem la instalare.php: a fost scos de pe server
+               anume, iar un invitat n-are ce face cu numele unui fișier.
+               Îi spunem doar că nu e din vina lui și pe cine să anunțe. */
+            ? 'Aprecierile nu funcționează acum. Spune-i organizatorului — nu e ceva ce ai greșit tu.'
             : 'Aprecierea nu s-a putut salva. Încearcă din nou.',
     ], JSON_UNESCAPED_UNICODE);
 }

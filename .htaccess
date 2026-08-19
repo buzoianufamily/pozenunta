@@ -35,6 +35,18 @@ DirectoryIndex index.php
   Require all denied
 </FilesMatch>
 
+# Uneltele de instalare și de diagnostic au fost șterse de pe server anume.
+# Ele există însă mai departe în arhiva codului, iar site-ul se actualizează
+# urcând folderul întreg — deci o singură re-urcare le-ar aduce înapoi fără
+# ca cineva să bage de seamă. „info.php" arăta, printre altele, cookie-ul
+# de sesiune al celui care îl deschidea. Regula de mai jos le ține închise
+# chiar dacă fișierele ajung din nou pe server.
+# Dacă vreodată chiar ai nevoie de „instalare.php" (baza de date stricată),
+# pune un # la începutul celor trei rânduri, folosește-l, apoi scoate-l.
+<FilesMatch "(?i)^(info|instalare|setup)\.php$">
+  Require all denied
+</FilesMatch>
+
 # UTF-8
 AddDefaultCharset UTF-8
 
