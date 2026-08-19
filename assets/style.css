@@ -193,7 +193,7 @@ img{max-width:100%;display:block}
   background:var(--card);box-shadow:var(--shadow-sm);cursor:pointer;
   opacity:0;transform:translateY(12px);transition:opacity .5s ease,transform .5s ease;
 }
-a.poza:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.poza:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .poza.vizibil{opacity:1;transform:none}
 /* Filmele fără miniatură se arată prin chiar eticheta de film, ca să se
    vadă primul cadru. E doar previzualizare: apăsarea deschide galeria,

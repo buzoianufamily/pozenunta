@@ -685,12 +685,30 @@
       poze.forEach(function (p) {
         var idx = toate.length; toate.push(p);
         var div = document.createElement('div'); div.className = 'poza'; div.setAttribute('data-idx', idx); div.setAttribute('data-id', p.id);
+        /* Placa era un simplu chenar cu o apăsare pusă pe el: cu degetul
+           mergea, dar de la tastatură nu se putea ajunge la ea deloc — deci
+           nu se putea deschide nicio poză fără ecran tactil sau maus.
+           Acum are rol de buton, intră în drumul cu Tab și se deschide și
+           cu Enter sau Space, ca orice buton. */
+        div.setAttribute('tabindex', '0');
+        div.setAttribute('role', 'button');
+        div.setAttribute('aria-label',
+          (p.tip === 'video' ? 'Vezi filmul' : 'Vezi fotografia') +
+          (p.nume ? ' de la ' + p.nume : ''));
         var inner = previzualizare(p, esc(p.nume || 'Fotografie de nuntă'));
         if (p.tip === 'video') inner += '<div class="play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>';
         inner += '<button class="inima' + (esteApreciat(p.id) ? ' activ' : '') + '" data-like="' + p.id + '" aria-label="Apreciază">' + inimaSVG() + '<span>' + p.aprecieri + '</span></button>';
         if (p.nume || p.mesaj) inner += '<div class="pe-poza">' + (p.nume ? '<div class="nume">' + esc(p.nume) + '</div>' : '') + (p.mesaj ? '<div class="ms">' + esc(p.mesaj.length > 90 ? p.mesaj.slice(0, 90) + '…' : p.mesaj) + '</div>' : '') + '</div>';
         div.innerHTML = inner;
-        div.addEventListener('click', function (e) { if (e.target.closest('.inima')) return; deschideLightbox(parseInt(div.getAttribute('data-idx'), 10)); });
+        function deschideDeAici(e) { if (e.target.closest('.inima')) return; deschideLightbox(parseInt(div.getAttribute('data-idx'), 10)); }
+        div.addEventListener('click', deschideDeAici);
+        /* Enter și Space, ca la orice buton. Space ar derula pagina, deci
+           îl oprim doar aici. */
+        div.addEventListener('keydown', function (e) {
+          if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+          if (e.target.closest('.inima')) return;
+          e.preventDefault(); deschideDeAici(e);
+        });
         var bInima = div.querySelector('.inima');
         bInima.addEventListener('click', function (e) { e.stopPropagation(); comutaLike(p.id); });
         galerieEl.appendChild(div); revealObs.observe(div);
