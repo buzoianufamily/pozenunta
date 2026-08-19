@@ -865,8 +865,28 @@
       });
     }
 
+    /* Un <video> aruncat din pagină NU își dă drumul singur pe iPhone.
+       WebKit ține fișierul deschis mai departe, iar telefonul suportă doar
+       un număr mic de filme încărcate în același timp. După câteva filme
+       deschise una după alta se atinge plafonul și ORICE film nou dă
+       eroare la încărcare — iar noi credeam că e din formatul filmului și
+       îi ofeream omului descărcarea. De aici venea și „am închis tabul și
+       a mers instant": închiderea paginii elibera tot.
+       Oprim filmul, îi luăm adresa și cerem „load()" — abia atunci WebKit
+       chiar dă drumul resursei. */
+    function elibereazaVideo() {
+      var v = lbCont.querySelector('video');
+      if (!v) return;
+      try {
+        v.pause();
+        v.removeAttribute('src');
+        v.load();
+      } catch (e) {}
+    }
+
     function randeaza(i) {
       var p = toate[i]; if (!p) return; idxCurent = i; lbIdActual = p.id;
+      elibereazaVideo();
       lbCont.innerHTML = p.tip === 'video'
         ? '<video class="lb-media" src="' + esc(p.original) + '" controls autoplay playsinline></video>'
         : '<img class="lb-media" src="' + esc(p.original) + '" alt="">';
@@ -899,14 +919,25 @@
       if (p.tip === 'video') {
         lbCont.querySelector('video').addEventListener('error', function () {
           if (lbIdActual !== p.id) return;          // între timp a trecut mai departe
+          /* Eroarea de la <video> nu spune DE CE. Poate fi formatul, dar
+             la fel de bine o clipă de rețea proastă sau telefonul care nu
+             mai are loc de încă un film. Vechiul text dădea vina pe format
+             de fiecare dată și lăsa o singură ieșire — descărcarea. Acum
+             prima ofertă e reîncercarea, care rezolvă cele două cazuri
+             dese, iar descărcarea rămâne dedesubt pentru formatul chiar
+             nepotrivit. */
           lbCont.innerHTML =
             '<div class="lb-neredabil">' +
               '<svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M12 8v5"/><path d="M12 16.5v.01"/><circle cx="12" cy="12" r="9"/></svg>' +
-              '<div class="titlu">Filmul nu se poate reda aici</div>' +
-              '<p>A fost filmat într-un format pe care acest telefon nu îl deschide în pagină. ' +
-              'Descarcă-l și îl vezi în aplicația ta de filme.</p>' +
-              '<a class="btn btn-primar" href="' + esc(p.original) + '" download="' + esc(numeDescarcare(p)) + '">Descarcă filmul</a>' +
+              '<div class="titlu">Filmul nu a pornit</div>' +
+              '<p>De obicei e o clipă de conexiune proastă și merge din a doua încercare.</p>' +
+              '<button type="button" class="btn btn-primar" id="lb-reia-film">Încearcă din nou</button>' +
+              '<p class="mic">Dacă nici așa nu pornește, filmul e într-un format ' +
+              'pe care telefonul tău nu îl deschide în pagină.</p>' +
+              '<a class="btn btn-ghost" href="' + esc(p.original) + '" download="' + esc(numeDescarcare(p)) + '">Descarcă filmul</a>' +
             '</div>';
+          var br = document.getElementById('lb-reia-film');
+          if (br) br.addEventListener('click', function () { randeaza(idxCurent); });
         });
       }
       var cap = '';
@@ -983,6 +1014,7 @@
     /* Închiderea propriu-zisă, fără să umble la istoric. */
     function inchideAcum() {
       lb.classList.remove('deschis'); lb.setAttribute('aria-hidden', 'true');
+      elibereazaVideo();          // altfel filmul rămâne deschis în telefon
       lbCont.innerHTML = ''; lbIdActual = null; document.body.style.overflow = '';
       if (focalizatInainte && focalizatInainte.focus) focalizatInainte.focus();
       focalizatInainte = null;
