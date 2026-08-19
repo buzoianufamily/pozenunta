@@ -131,19 +131,33 @@ cap_pagina('Acasă', 'acasa');
       /* Banda merge la nesfârșit pentru că lista e scrisă de două ori, iar
          animația mută pista exact cu o jumătate din ea. Când ajunge acolo,
          a doua copie stă fix unde stătea prima — se reia fără nicio
-         săritură. Durata crește cu numărul de momente, ca viteza să pară
-         aceeași fie că sunt 4 poze, fie 14. */
-      $durata = max(20, count($pozeRecente) * 4);
+         săritură.
+
+         Dar la începutul serii albumul are două-trei poze, iar o tură de
+         câteva sute de puncte nu acoperă un ecran de laptop: banda s-ar
+         roti cu un gol în urma ei. Așa că repetăm lista până când o tură
+         trece de un ecran lat, și abia apoi o dublăm pentru buclă. Cu
+         albumul plin nu se repetă nimic. */
+      $minPeTura = 9;                       // 9 × (210 + 14) ≈ 2000 puncte
+      $set = $pozeRecente;
+      if ($set) { while (count($set) < $minPeTura) $set = array_merge($set, $pozeRecente); }
+      $originale = count($pozeRecente);
+      $durata    = max(20, count($set) * 4);   // viteza rămâne aceeași
     ?>
     <div class="banda" aria-label="Cele mai noi momente din album">
       <div class="banda-pista" style="animation-duration:<?= (int)$durata ?>s">
         <?php for ($copie = 0; $copie < 2; $copie++): ?>
-          <?php foreach ($pozeRecente as $p): ?>
+          <?php foreach ($set as $k => $p):
+            /* Cititorului de ecran îi dăm o singură dată fiecare moment:
+               copiile pentru buclă și repetările de la începutul serii
+               sunt doar decor. */
+            $decor = $copie > 0 || $k >= $originale;
+          ?>
             <?php /* Legătura duce la momentul ANUME, nu doar la galerie:
                      apeși pe un film și se deschide chiar el, acolo unde
                      are voie să pornească. */ ?>
             <a class="banda-item" href="galerie#m<?= (int)$p['id'] ?>"
-               <?= $copie ? 'aria-hidden="true" tabindex="-1"' : 'aria-label="' . ($p['tip'] === 'video' ? 'Vezi filmul în galerie' : 'Vezi fotografia în galerie') . '"' ?>>
+               <?= $decor ? 'aria-hidden="true" tabindex="-1"' : 'aria-label="' . ($p['tip'] === 'video' ? 'Vezi filmul în galerie' : 'Vezi fotografia în galerie') . '"' ?>>
               <?php if (are_miniatura($p)): ?>
                 <img loading="lazy" decoding="async" src="<?= h(url_previzualizare($p)) ?>" alt="">
               <?php else: ?>

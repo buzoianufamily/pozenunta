@@ -705,14 +705,37 @@
        arată cele mai noi, deci sunt toate acolo. */
     function deschideDinAdresa() {
       var m = /^#m(\d+)$/.exec(location.hash || '');
-      if (!m) return;
-      var id = parseInt(m[1], 10);
-      for (var i = 0; i < toate.length; i++) {
-        if (toate[i].id === id) { deschideLightbox(i); break; }
+      /* Curățăm adresa oricum: dacă închide și reîncarcă pagina, nu vrem
+         să-i sară din nou același fișier în față. */
+      function curataAdresa() {
+        if (history.replaceState) history.replaceState(null, '', location.pathname + location.search);
       }
-      /* Curățăm adresa: dacă închide și reîncarcă pagina, nu vrem să-i
-         sară din nou același fișier în față. */
-      if (history.replaceState) history.replaceState(null, '', location.pathname + location.search);
+      if (!m) return Promise.resolve();
+      var id = parseInt(m[1], 10);
+
+      function caută() {
+        for (var i = 0; i < toate.length; i++) if (toate[i].id === id) return i;
+        return -1;
+      }
+
+      var i = caută();
+      if (i >= 0) { deschideLightbox(i); curataAdresa(); return Promise.resolve(); }
+
+      /* Nu e printre momentele încărcate — banda alege din tot albumul,
+         deci poate fi de la începutul serii. Îl cerem punctual, într-o
+         singură cerere, în loc să încărcăm galeria pagină cu pagină până
+         la el. */
+      return fetch('api.php?actiune=poza&id=' + id)
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d && d.ok && d.poza) {
+            sincronizeazaLike([d.poza]);
+            toate.push(d.poza);
+            deschideLightbox(toate.length - 1);
+          }
+        })
+        .catch(function () {})
+        .finally(curataAdresa);
     }
 
     incarcaPagina().then(deschideDinAdresa);
