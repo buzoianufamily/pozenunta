@@ -621,7 +621,19 @@
         toast(done + ' încărcate, ' + erori + ' rămase. Apasă „Reîncearcă".');
         adaugaButonReincercare(erori);
       } else if (erori > 0) {
-        toast('Conexiune instabilă. Apasă „Reîncearcă".');
+        /* Nu mai dăm vina pe conexiune din oficiu. Dacă serverul a răspuns
+           și a spus DE CE n-a putut (discul plin, folder nescriabil), atunci
+           conexiunea e perfectă, iar invitatul apăsa „Reîncearcă" la
+           nesfârșit învinovățind wi-fi-ul sălii. „ultimaEroare" e pus doar
+           când răspunsul a venit; lipsa lui chiar înseamnă că nu a venit
+           niciun răspuns — abia atunci e vina rețelei. */
+        var motivServer = null;
+        coada.forEach(function (it) {
+          if (!motivServer && it.status === 'error' && it.ultimaEroare) motivServer = it.ultimaEroare;
+        });
+        toast(motivServer
+          ? motivServer + ' Dacă se repetă, spune-i organizatorului.'
+          : 'Conexiune instabilă. Apasă „Reîncearcă".');
         adaugaButonReincercare(erori);
       }
     }
