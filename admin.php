@@ -149,6 +149,27 @@ $nrImagini = (int)$pdo->query("SELECT COUNT(*) FROM poze WHERE tip='imagine'")->
 $nrVideo   = (int)$pdo->query("SELECT COUNT(*) FROM poze WHERE tip='video'")->fetchColumn();
 $nrInvitati= (int)$pdo->query("SELECT COUNT(DISTINCT nume_invitat) FROM poze WHERE nume_invitat IS NOT NULL AND nume_invitat <> ''")->fetchColumn();
 $spatiu    = (int)$pdo->query('SELECT COALESCE(SUM(marime),0) FROM poze')->fetchColumn();
+
+/* Suma din baza de date acoperă doar fișierele întregi. Pe disc mai stau
+   două lucruri care nu se vedeau deloc în bară:
+   - miniaturile (una de fiecare fișier);
+   - BUCĂȚILE de filme începute și neterminate. Astea contează: cine
+     începe un film de 300 MB și pleacă la dans lasă jumătate pe disc, iar
+     ele se șterg abia după 48 de ore — adică mult după nuntă. La zeci de
+     invitați se pot aduna gigaocteți nevăzuți, exact când bara ar trebui
+     să avertizeze.
+   Le numărăm ca să arate adevărul. Sunt două citiri de folder, doar în
+   panou, deci nu ating cu nimic paginile invitaților. */
+function marime_folder(string $cale, string $tipar = '*'): int {
+    $t = 0;
+    foreach ((array)@glob(rtrim($cale, '/') . '/' . $tipar) as $f) {
+        if (is_file($f)) $t += (int)@filesize($f);
+    }
+    return $t;
+}
+$spatiuMiniaturi = marime_folder(THUMB_DIR, '*.jpg');
+$spatiuBucati    = marime_folder(UPLOAD_DIR . '.parti', '*.part');
+$spatiu         += $spatiuMiniaturi + $spatiuBucati;
 $nrAstept  = (int)$pdo->query('SELECT COUNT(*) FROM poze WHERE aprobat=0')->fetchColumn();
 
 /* Urările: cele neaprobate primele, ca să sară în ochi. */
@@ -270,6 +291,15 @@ $poze = $stmt->fetchAll();
         <p class="ajutor" style="color:var(--err);margin-top:10px">Discul e aproape plin. Cumpără spațiu suplimentar din cPanel/RoMarg, apoi mărește <code>DISK_QUOTA_GB</code> în <code>config.php</code>.</p>
       <?php elseif ($procentDisc >= 70): ?>
         <p class="ajutor" style="margin-top:10px">Ai folosit <?= $procentDisc ?>% din spațiu. Mai ai loc, dar urmărește filmele — ele ocupă cel mai mult.</p>
+      <?php endif; ?>
+      <?php if ($spatiuBucati > 0): ?>
+        <?php /* Bucăți de filme începute și nelăsate să se termine. Sunt
+                 numărate mai sus, dar merită spuse separat: se șterg
+                 singure, deci nu trebuie umblat la ele. */ ?>
+        <p class="ajutor" style="margin-top:10px">
+          Din care <strong><?= h(format_marime($spatiuBucati)) ?></strong> sunt filme începute și neterminate
+          (cineva a ieșit din aplicație în timpul încărcării). Se șterg singure după 48 de ore.
+        </p>
       <?php endif; ?>
     </div>
 
